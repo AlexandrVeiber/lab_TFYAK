@@ -20,6 +20,37 @@
     <None Remove="Assets\run.png" />
     <None Remove="Assets\save.png" />
     <None Remove="Assets\undo.png" />
+    <None Remove="Texts\class.txt" />
+    <None Remove="Texts\grammar.txt" />
+    <None Remove="Texts\method.txt" />
+    <None Remove="Texts\refs.txt" />
+    <None Remove="Texts\source.txt" />
+    <None Remove="Texts\task.txt" />
+    <None Remove="Texts\test.txt" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="Texts\class.txt">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Texts\grammar.txt">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Texts\method.txt">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Texts\refs.txt">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Texts\source.txt">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Texts\task.txt">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Texts\test.txt">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 
   <ItemGroup>

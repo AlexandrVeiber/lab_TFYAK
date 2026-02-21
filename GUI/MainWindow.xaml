@@ -5,6 +5,19 @@
         MinHeight="450" MinWidth="700"
         Closing="Window_Closing">
 
+    <!-- Горячие клавиши -->
+    <Window.InputBindings>
+        <KeyBinding Key="Z" Modifiers="Control" Command="{x:Static ApplicationCommands.Undo}" />
+        <KeyBinding Key="Y" Modifiers="Control" Command="{x:Static ApplicationCommands.Redo}" />
+
+        <KeyBinding Key="X" Modifiers="Control" Command="{x:Static ApplicationCommands.Cut}" />
+        <KeyBinding Key="C" Modifiers="Control" Command="{x:Static ApplicationCommands.Copy}" />
+        <KeyBinding Key="V" Modifiers="Control" Command="{x:Static ApplicationCommands.Paste}" />
+
+        <KeyBinding Key="A" Modifiers="Control" Command="{x:Static ApplicationCommands.SelectAll}" />
+        <KeyBinding Key="Delete" Command="{x:Static ApplicationCommands.Delete}" />
+    </Window.InputBindings>
+
     <DockPanel>
 
         <!-- Меню -->
@@ -20,15 +33,15 @@
             </MenuItem>
 
             <MenuItem Header="_Правка">
-                <MenuItem Header="Отменить" Click="EditUndo_Click"/>
-                <MenuItem Header="Повторить" Click="EditRedo_Click"/>
+                <MenuItem Header="Отменить" Click="EditUndo_Click" InputGestureText="Ctrl+Z"/>
+                <MenuItem Header="Повторить" Click="EditRedo_Click" InputGestureText="Ctrl+Y"/>
                 <Separator/>
-                <MenuItem Header="Вырезать" Click="EditCut_Click"/>
-                <MenuItem Header="Копировать" Click="EditCopy_Click"/>
-                <MenuItem Header="Вставить" Click="EditPaste_Click"/>
-                <MenuItem Header="Удалить" Click="EditDelete_Click"/>
+                <MenuItem Header="Вырезать" Click="EditCut_Click" InputGestureText="Ctrl+X"/>
+                <MenuItem Header="Копировать" Click="EditCopy_Click" InputGestureText="Ctrl+C"/>
+                <MenuItem Header="Вставить" Click="EditPaste_Click" InputGestureText="Ctrl+V"/>
+                <MenuItem Header="Удалить" Click="EditDelete_Click" InputGestureText="Del"/>
                 <Separator/>
-                <MenuItem Header="Выделить всё" Click="EditSelectAll_Click"/>
+                <MenuItem Header="Выделить всё" Click="EditSelectAll_Click" InputGestureText="Ctrl+A"/>
             </MenuItem>
 
             <MenuItem Header="_Текст">
@@ -126,7 +139,21 @@
                      FontFamily="Consolas"
                      FontSize="14"
                      Margin="6"
-                     TextChanged="EditorTextBox_TextChanged"/>
+                     TextChanged="EditorTextBox_TextChanged">
+
+                <!-- Привязка команд к нашим обработчикам -->
+                <TextBox.CommandBindings>
+                    <CommandBinding Command="ApplicationCommands.Undo" Executed="EditUndo_Click"/>
+                    <CommandBinding Command="ApplicationCommands.Redo" Executed="EditRedo_Click"/>
+
+                    <CommandBinding Command="ApplicationCommands.Cut" Executed="EditCut_Click"/>
+                    <CommandBinding Command="ApplicationCommands.Copy" Executed="EditCopy_Click"/>
+                    <CommandBinding Command="ApplicationCommands.Paste" Executed="EditPaste_Click"/>
+
+                    <CommandBinding Command="ApplicationCommands.Delete" Executed="EditDelete_Click"/>
+                    <CommandBinding Command="ApplicationCommands.SelectAll" Executed="EditSelectAll_Click"/>
+                </TextBox.CommandBindings>
+            </TextBox>
 
             <!-- Разделитель -->
             <GridSplitter Grid.Row="1"
@@ -148,4 +175,4 @@
         </Grid>
 
     </DockPanel>
-</Window> 
+</Window>

@@ -111,9 +111,7 @@ namespace GUI
                 MessageBoxImage.Question);
 
             if (res == MessageBoxResult.Cancel) return false;
-
-            if (res == MessageBoxResult.Yes)
-                return TrySave();
+            if (res == MessageBoxResult.Yes) return TrySave();
 
             return true; // No
         }
@@ -183,50 +181,70 @@ namespace GUI
             EditorTextBox.Focus();
         }
 
+        // ---------- Текст (читаем из файлов) ----------
         private void TextTask_Click(object sender, RoutedEventArgs e)
         {
-            ShowTextWindow("Постановка задачи",
-                "Здесь должна быть постановка задачи из методички.\n\n" +
-                "Пока что: сделать GUI для языкового процессора (редактор + вывод результата).");
+            ShowTextFromFile("Постановка задачи", "task.txt");
         }
 
         private void TextGrammar_Click(object sender, RoutedEventArgs e)
         {
-            ShowTextWindow("Грамматика",
-                "Раздел будет заполнен позже (по мере реализации анализатора).");
+            ShowTextFromFile("Грамматика", "grammar.txt");
         }
 
         private void TextGrammarClass_Click(object sender, RoutedEventArgs e)
         {
-            ShowTextWindow("Классификация грамматики",
-                "Раздел будет заполнен позже.");
+            ShowTextFromFile("Классификация грамматики", "class.txt");
         }
 
         private void TextAnalyzeMethod_Click(object sender, RoutedEventArgs e)
         {
-            ShowTextWindow("Метод анализа",
-                "Раздел будет заполнен позже.");
+            ShowTextFromFile("Метод анализа", "method.txt");
         }
 
         private void TextTest_Click(object sender, RoutedEventArgs e)
         {
-            ShowTextWindow("Тестовый пример",
-                "Пример будет добавлен позже.\n\n" +
-                "Сейчас можно ввести любой текст и нажать 'Пуск' — программа выведет статистику.");
+            ShowTextFromFile("Тестовый пример", "test.txt");
         }
 
         private void TextRefs_Click(object sender, RoutedEventArgs e)
         {
-            ShowTextWindow("Список литературы",
-                "1) Методические материалы по ТФЯК\n2) Документация WPF (Microsoft)");
+            ShowTextFromFile("Список литературы", "refs.txt");
         }
 
         private void TextSource_Click(object sender, RoutedEventArgs e)
         {
-            ShowTextWindow("Исходный код программы",
-                "Исходный код находится в репозитории GitHub: lab_TFYAK");
+            ShowTextFromFile("Исходный код программы", "source.txt");
         }
 
+        private void ShowTextFromFile(string title, string fileName)
+        {
+            try
+            {
+                // Файлы лежат рядом с exe в папке Texts (если Build Action=Content + Copy)
+                string path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Texts", fileName);
+
+                if (!File.Exists(path))
+                {
+                    MessageBox.Show(
+                        "Не найден файл:\n" + path + "\n\nПроверь, что для файла выставлено:\n" +
+                        "- Build Action: Content\n- Copy to Output Directory: Copy if newer",
+                        "GUI",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+                    return;
+                }
+
+                string text = File.ReadAllText(path);
+                ShowTextWindow(title, text);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Ошибка чтения файла: " + ex.Message);
+            }
+        }
+
+        // ---------- Пуск ----------
         private void Run_Click(object sender, RoutedEventArgs e)
         {
             string text = EditorTextBox.Text;
@@ -247,6 +265,7 @@ namespace GUI
                 $"Время: {DateTime.Now}";
         }
 
+        // ---------- Окна ----------
         private void ShowTextWindow(string title, string text)
         {
             var w = new HelpWindow(title, text);
