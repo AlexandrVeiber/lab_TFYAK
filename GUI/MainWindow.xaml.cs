@@ -266,6 +266,21 @@ namespace GUI
         }
 
         // ---------- Окна ----------
+
+        private string ReadTextFileOrError(string fileName)
+        {
+            string path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Texts", fileName);
+
+            if (!File.Exists(path))
+            {
+                return "Не найден файл:\n" + path + "\n\n" +
+                       "Проверь свойства файла:\n" +
+                       "- Build Action: Content\n" +
+                       "- Copy to Output Directory: Copy if newer";
+            }
+
+            return File.ReadAllText(path);
+        }
         private void ShowTextWindow(string title, string text)
         {
             var w = new HelpWindow(title, text);
@@ -275,15 +290,7 @@ namespace GUI
 
         private void Help_Click(object sender, RoutedEventArgs e)
         {
-            string text =
-                "Реализованные функции:\n\n" +
-                "Файл:\n" +
-                "- Создать\n- Открыть\n- Сохранить / Сохранить как\n- Выход (с проверкой несохранённых изменений)\n\n" +
-                "Правка:\n" +
-                "- Undo / Redo\n- Cut / Copy / Paste\n- Delete\n- Select All\n\n" +
-                "Пуск:\n" +
-                "- Сейчас заглушка: выводит простую статистику по тексту.\n\n" +
-                "Панель инструментов повторяет основные команды меню.";
+            string text = ReadTextFileOrError("help.txt");
 
             var w = new HelpWindow("Справка", text);
             w.Owner = this;
@@ -292,7 +299,9 @@ namespace GUI
 
         private void About_Click(object sender, RoutedEventArgs e)
         {
-            var w = new AboutWindow();
+            string text = ReadTextFileOrError("about.txt");
+
+            var w = new AboutWindow(text);
             w.Owner = this;
             w.ShowDialog();
         }
