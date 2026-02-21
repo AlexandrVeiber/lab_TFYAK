@@ -1,0 +1,21 @@
+﻿<Window x:Class="GUI.AboutWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="О программе" Height="260" Width="420"
+        WindowStartupLocation="CenterOwner">
+    <Grid Margin="12">
+        <StackPanel>
+            <TextBlock Text="GUI" FontSize="22" FontWeight="Bold" Margin="0,0,0,10"/>
+            <TextBlock Text="Лабораторная работа по ТФЯК" FontSize="14"/>
+            <TextBlock Text="WPF / C# (.NET)" Margin="0,6,0,0"/>
+            <TextBlock Text="Автор: Александр" Margin="0,6,0,0"/>
+            <TextBlock Text="Репозиторий: lab_TFYAK" Margin="0,6,0,0"/>
+
+            <Button Content="ОК"
+                    Width="90"
+                    Margin="0,16,0,0"
+                    HorizontalAlignment="Right"
+                    Click="Ok_Click"/>
+        </StackPanel>
+    </Grid>
+</Window>

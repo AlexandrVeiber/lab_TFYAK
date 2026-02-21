@@ -183,40 +183,48 @@ namespace GUI
             EditorTextBox.Focus();
         }
 
-        // ---------- Пока заглушки (доделаем следующим коммитом) ----------
         private void TextTask_Click(object sender, RoutedEventArgs e)
         {
-            OutputTextBox.Text = "Раздел 'Текст' пока не заполнен.";
+            ShowTextWindow("Постановка задачи",
+                "Здесь должна быть постановка задачи из методички.\n\n" +
+                "Пока что: сделать GUI для языкового процессора (редактор + вывод результата).");
         }
 
         private void TextGrammar_Click(object sender, RoutedEventArgs e)
         {
-            OutputTextBox.Text = "Раздел 'Текст' пока не заполнен.";
+            ShowTextWindow("Грамматика",
+                "Раздел будет заполнен позже (по мере реализации анализатора).");
         }
 
         private void TextGrammarClass_Click(object sender, RoutedEventArgs e)
         {
-            OutputTextBox.Text = "Раздел 'Текст' пока не заполнен.";
+            ShowTextWindow("Классификация грамматики",
+                "Раздел будет заполнен позже.");
         }
 
         private void TextAnalyzeMethod_Click(object sender, RoutedEventArgs e)
         {
-            OutputTextBox.Text = "Раздел 'Текст' пока не заполнен.";
+            ShowTextWindow("Метод анализа",
+                "Раздел будет заполнен позже.");
         }
 
         private void TextTest_Click(object sender, RoutedEventArgs e)
         {
-            OutputTextBox.Text = "Раздел 'Текст' пока не заполнен.";
+            ShowTextWindow("Тестовый пример",
+                "Пример будет добавлен позже.\n\n" +
+                "Сейчас можно ввести любой текст и нажать 'Пуск' — программа выведет статистику.");
         }
 
         private void TextRefs_Click(object sender, RoutedEventArgs e)
         {
-            OutputTextBox.Text = "Раздел 'Текст' пока не заполнен.";
+            ShowTextWindow("Список литературы",
+                "1) Методические материалы по ТФЯК\n2) Документация WPF (Microsoft)");
         }
 
         private void TextSource_Click(object sender, RoutedEventArgs e)
         {
-            OutputTextBox.Text = "Исходники лежат в репозитории.";
+            ShowTextWindow("Исходный код программы",
+                "Исходный код находится в репозитории GitHub: lab_TFYAK");
         }
 
         private void Run_Click(object sender, RoutedEventArgs e)
@@ -239,24 +247,35 @@ namespace GUI
                 $"Время: {DateTime.Now}";
         }
 
+        private void ShowTextWindow(string title, string text)
+        {
+            var w = new HelpWindow(title, text);
+            w.Owner = this;
+            w.ShowDialog();
+        }
+
         private void Help_Click(object sender, RoutedEventArgs e)
         {
-            MessageBox.Show(
-                "Файл: создать/открыть/сохранить/сохранить как/выход.\n" +
-                "Правка: undo/redo/cut/copy/paste/delete/select all.\n" +
-                "Пуск: пока заглушка (статистика по тексту).",
-                "Справка",
-                MessageBoxButton.OK,
-                MessageBoxImage.Information);
+            string text =
+                "Реализованные функции:\n\n" +
+                "Файл:\n" +
+                "- Создать\n- Открыть\n- Сохранить / Сохранить как\n- Выход (с проверкой несохранённых изменений)\n\n" +
+                "Правка:\n" +
+                "- Undo / Redo\n- Cut / Copy / Paste\n- Delete\n- Select All\n\n" +
+                "Пуск:\n" +
+                "- Сейчас заглушка: выводит простую статистику по тексту.\n\n" +
+                "Панель инструментов повторяет основные команды меню.";
+
+            var w = new HelpWindow("Справка", text);
+            w.Owner = this;
+            w.ShowDialog();
         }
 
         private void About_Click(object sender, RoutedEventArgs e)
         {
-            MessageBox.Show(
-                "GUI (часть проекта по ТФЯК)\nWPF / C#\nАвтор: Александр",
-                "О программе",
-                MessageBoxButton.OK,
-                MessageBoxImage.Information);
+            var w = new AboutWindow();
+            w.Owner = this;
+            w.ShowDialog();
         }
     }
 }
