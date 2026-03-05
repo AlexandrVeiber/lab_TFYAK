@@ -37,17 +37,11 @@ namespace GUI.Scanner
                 // --- 2) Пробелы/табы/CR ---
                 if (ch == ' ' || ch == '\t' || ch == '\r')
                 {
-                    int start = i;
-                    int startCol = col;
-
                     while (i < text.Length && (text[i] == ' ' || text[i] == '\t' || text[i] == '\r'))
                     {
                         i++;
                         col++;
                     }
-
-                    string ws = text.Substring(start, i - start);
-                    result.Add(MakeLexeme(CODE_WHITESPACE, "разделитель (пробел)", ws, line, startCol, col - 1, start, ws.Length));
                     continue;
                 }
 

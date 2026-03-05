@@ -255,14 +255,20 @@ namespace GUI
                 return;
             }
 
-            int lines = text.Split('\n').Length;
-            int chars = text.Length;
+            var scanner = new GUI.Scanner.LexicalAnalyzer();
+            var lexemes = scanner.Analyze(text);
 
-            OutputTextBox.Text =
-                "Пуск: заглушка анализа.\n" +
-                $"Строк: {lines}\n" +
-                $"Символов: {chars}\n" +
-                $"Время: {DateTime.Now}";
+            // выводим красиво в OutputTextBox (временно)
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine("Результат лексического анализа:");
+            sb.AppendLine("--------------------------------------------");
+
+            foreach (var l in lexemes)
+            {
+                sb.AppendLine($"{l.Code}\t{l.Type}\t{l.Text}\t{l.Location}");
+            }
+
+            OutputTextBox.Text = sb.ToString();
         }
 
         // ---------- Окна ----------
