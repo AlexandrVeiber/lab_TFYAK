@@ -65,7 +65,6 @@
         <!-- Панель инструментов -->
         <ToolBarTray DockPanel.Dock="Top">
             <ToolBar>
-
                 <Button Style="{StaticResource ToolBtn}" ToolTip="Создать" Click="FileNew_Click">
                     <Image Source="Assets/new.png"/>
                 </Button>
@@ -117,11 +116,10 @@
                 <Button Style="{StaticResource ToolBtn}" ToolTip="О программе" Click="About_Click">
                     <Image Source="Assets/info.png"/>
                 </Button>
-
             </ToolBar>
         </ToolBarTray>
 
-        <!-- Основная область: редактор + вывод -->
+        <!-- Основная область -->
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="*" />
@@ -141,15 +139,12 @@
                      Margin="6"
                      TextChanged="EditorTextBox_TextChanged">
 
-                <!-- Привязка команд к нашим обработчикам -->
                 <TextBox.CommandBindings>
                     <CommandBinding Command="ApplicationCommands.Undo" Executed="EditUndo_Click"/>
                     <CommandBinding Command="ApplicationCommands.Redo" Executed="EditRedo_Click"/>
-
                     <CommandBinding Command="ApplicationCommands.Cut" Executed="EditCut_Click"/>
                     <CommandBinding Command="ApplicationCommands.Copy" Executed="EditCopy_Click"/>
                     <CommandBinding Command="ApplicationCommands.Paste" Executed="EditPaste_Click"/>
-
                     <CommandBinding Command="ApplicationCommands.Delete" Executed="EditDelete_Click"/>
                     <CommandBinding Command="ApplicationCommands.SelectAll" Executed="EditSelectAll_Click"/>
                 </TextBox.CommandBindings>
@@ -162,17 +157,58 @@
                           Background="#DDD"
                           ShowsPreview="True"/>
 
-            <!-- Низ: вывод -->
-            <TextBox x:Name="OutputTextBox"
-                     Grid.Row="2"
-                     IsReadOnly="True"
-                     VerticalScrollBarVisibility="Auto"
-                     HorizontalScrollBarVisibility="Auto"
-                     FontFamily="Consolas"
-                     FontSize="13"
-                     Margin="6"
-                     Background="#F7F7F7"/>
-        </Grid>
+            <!-- Низ: статус + таблица -->
+            <DockPanel Grid.Row="2" Margin="6">
 
+                <Border DockPanel.Dock="Top"
+                        Padding="8,4"
+                        Background="#F5F5F5"
+                        BorderBrush="#DDDDDD"
+                        BorderThickness="1"
+                        CornerRadius="4"
+                        Margin="0,0,0,6">
+                    <TextBlock x:Name="StatusTextBlock"
+                               Foreground="Gray"
+                               Text=""/>
+                </Border>
+
+                <DataGrid x:Name="LexemesGrid"
+                          AutoGenerateColumns="False"
+                          IsReadOnly="True"
+                          SelectionMode="Single"
+                          CanUserAddRows="False"
+                          CanUserDeleteRows="False"
+                          CanUserResizeRows="False"
+                          GridLinesVisibility="Horizontal"
+                          HeadersVisibility="Column"
+                          RowHeaderWidth="0"
+                          AlternatingRowBackground="#FAFAFA"
+                          BorderBrush="#DDDDDD"
+                          BorderThickness="1">
+
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Код"
+                                            Binding="{Binding Code}"
+                                            Width="Auto"
+                                            MinWidth="60"/>
+
+                        <DataGridTextColumn Header="Тип"
+                                            Binding="{Binding Type}"
+                                            Width="2*"
+                                            MinWidth="170"/>
+
+                        <DataGridTextColumn Header="Лексема"
+                                            Binding="{Binding Text}"
+                                            Width="*"
+                                            MinWidth="120"/>
+
+                        <DataGridTextColumn Header="Позиция"
+                                            Binding="{Binding Location}"
+                                            Width="Auto"
+                                            MinWidth="150"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </DockPanel>
+        </Grid>
     </DockPanel>
 </Window>

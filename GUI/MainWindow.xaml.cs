@@ -2,6 +2,7 @@
 using System;
 using System.ComponentModel;
 using System.IO;
+using System.Linq;
 using System.Windows;
 
 namespace GUI
@@ -15,6 +16,7 @@ namespace GUI
         {
             InitializeComponent();
             UpdateTitle();
+            StatusTextBlock.Text = "Ожидание...";
         }
 
         private void UpdateTitle()
@@ -35,7 +37,8 @@ namespace GUI
             if (!AskSaveIfNeeded()) return;
 
             EditorTextBox.Clear();
-            OutputTextBox.Clear();
+            LexemesGrid.ItemsSource = null;
+            StatusTextBlock.Text = "Создан новый документ.";
             _currentFilePath = null;
             _isDirty = false;
             UpdateTitle();
@@ -55,7 +58,8 @@ namespace GUI
                 _isDirty = false;
                 UpdateTitle();
 
-                OutputTextBox.Text = "Открыт файл: " + dlg.FileName;
+                LexemesGrid.ItemsSource = null;
+                StatusTextBlock.Text = "Открыт файл: " + dlg.FileName;
             }
         }
 
@@ -70,7 +74,7 @@ namespace GUI
             File.WriteAllText(_currentFilePath, EditorTextBox.Text);
             _isDirty = false;
             UpdateTitle();
-            OutputTextBox.Text = "Сохранено: " + _currentFilePath;
+            StatusTextBlock.Text = "Сохранено: " + _currentFilePath;
         }
 
         private void FileSaveAs_Click(object sender, RoutedEventArgs e)
@@ -85,7 +89,7 @@ namespace GUI
                 File.WriteAllText(_currentFilePath, EditorTextBox.Text);
                 _isDirty = false;
                 UpdateTitle();
-                OutputTextBox.Text = "Сохранено: " + _currentFilePath;
+                StatusTextBlock.Text = "Сохранено: " + _currentFilePath;
             }
         }
 
@@ -113,7 +117,7 @@ namespace GUI
             if (res == MessageBoxResult.Cancel) return false;
             if (res == MessageBoxResult.Yes) return TrySave();
 
-            return true; // No
+            return true;
         }
 
         private bool TrySave()
@@ -133,7 +137,7 @@ namespace GUI
                 File.WriteAllText(_currentFilePath, EditorTextBox.Text);
                 _isDirty = false;
                 UpdateTitle();
-                OutputTextBox.Text = "Сохранено: " + _currentFilePath;
+                StatusTextBlock.Text = "Сохранено: " + _currentFilePath;
                 return true;
             }
             catch (Exception ex)
@@ -181,7 +185,7 @@ namespace GUI
             EditorTextBox.Focus();
         }
 
-        // ---------- Текст (читаем из файлов) ----------
+        // ---------- Текст ----------
         private void TextTask_Click(object sender, RoutedEventArgs e)
         {
             ShowTextFromFile("Постановка задачи", "task.txt");
@@ -221,7 +225,6 @@ namespace GUI
         {
             try
             {
-                // Файлы лежат рядом с exe в папке Texts (если Build Action=Content + Copy)
                 string path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Texts", fileName);
 
                 if (!File.Exists(path))
@@ -251,28 +254,30 @@ namespace GUI
 
             if (string.IsNullOrWhiteSpace(text))
             {
-                OutputTextBox.Text = "Пуск: текст пустой.";
+                LexemesGrid.ItemsSource = null;
+                StatusTextBlock.Text = "Текст пустой.";
+                MessageBox.Show("Текст пустой.");
                 return;
             }
 
             var scanner = new GUI.Scanner.LexicalAnalyzer();
             var lexemes = scanner.Analyze(text);
 
-            // выводим красиво в OutputTextBox (временно)
-            var sb = new System.Text.StringBuilder();
-            sb.AppendLine("Результат лексического анализа:");
-            sb.AppendLine("--------------------------------------------");
+            LexemesGrid.ItemsSource = lexemes;
 
-            foreach (var l in lexemes)
+            int errorCount = lexemes.Count(l => l.IsError);
+
+            if (errorCount == 0)
             {
-                sb.AppendLine($"{l.Code}\t{l.Type}\t{l.Text}\t{l.Location}");
+                StatusTextBlock.Text = $"Лексический анализ завершён. Найдено лексем: {lexemes.Count}. Ошибок нет.";
             }
-
-            OutputTextBox.Text = sb.ToString();
+            else
+            {
+                StatusTextBlock.Text = $"Лексический анализ завершён. Найдено лексем: {lexemes.Count}. Ошибок: {errorCount}.";
+            }
         }
 
         // ---------- Окна ----------
-
         private string ReadTextFileOrError(string fileName)
         {
             string path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Texts", fileName);
@@ -287,6 +292,7 @@ namespace GUI
 
             return File.ReadAllText(path);
         }
+
         private void ShowTextWindow(string title, string text)
         {
             var w = new HelpWindow(title, text);
