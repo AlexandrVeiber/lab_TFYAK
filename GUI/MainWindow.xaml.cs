@@ -17,6 +17,9 @@ namespace GUI
             InitializeComponent();
             UpdateTitle();
             StatusTextBlock.Text = "Ожидание...";
+
+            LexemesGrid.ItemsSource = null;
+            LexemesGrid.Items.Clear();
         }
 
         private void UpdateTitle()
@@ -252,9 +255,12 @@ namespace GUI
         {
             string text = EditorTextBox.Text;
 
+            // Полностью очищаем таблицу перед новым выводом
+            LexemesGrid.ItemsSource = null;
+            LexemesGrid.Items.Clear();
+
             if (string.IsNullOrWhiteSpace(text))
             {
-                LexemesGrid.ItemsSource = null;
                 StatusTextBlock.Text = "Текст пустой.";
                 MessageBox.Show("Текст пустой.");
                 return;
@@ -274,6 +280,32 @@ namespace GUI
             else
             {
                 StatusTextBlock.Text = $"Лексический анализ завершён. Найдено лексем: {lexemes.Count}. Ошибок: {errorCount}.";
+            }
+        }
+
+        private void LexemesGrid_MouseDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            if (LexemesGrid.SelectedItem is GUI.Scanner.Lexeme lex)
+            {
+                // Переходим только по ошибкам
+                if (!lex.IsError)
+                    return;
+
+                int index = lex.StartIndex;
+
+                if (index < 0)
+                    index = 0;
+
+                if (index > EditorTextBox.Text.Length)
+                    index = EditorTextBox.Text.Length;
+
+                EditorTextBox.Focus();
+                EditorTextBox.Select(index, Math.Max(lex.Length, 1));
+
+                int lineIndex = EditorTextBox.GetLineIndexFromCharacterIndex(index);
+                EditorTextBox.ScrollToLine(lineIndex);
+
+                StatusTextBlock.Text = $"Переход к ошибке: {lex.Location}";
             }
         }
 

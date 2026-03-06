@@ -92,8 +92,29 @@ namespace GUI.Scanner
                     continue;
                 }
 
-                // --- 5) Операторы/разделители (по одному или два символа) ---
-                // 5.1 -- (декремент)
+                // --- 5) Операторы и разделители ---
+
+                // 5.1 + и ++
+                if (ch == '+')
+                {
+                    int start = i;
+                    int startCol = col;
+
+                    if (i + 1 < text.Length && text[i + 1] == '+')
+                    {
+                        i += 2;
+                        col += 2;
+                        result.Add(MakeLexeme(CODE_OPERATOR, "оператор", "++", line, startCol, col - 1, start, 2));
+                        continue;
+                    }
+
+                    i++;
+                    col++;
+                    result.Add(MakeLexeme(CODE_OPERATOR, "оператор", "+", line, startCol, col - 1, start, 1));
+                    continue;
+                }
+
+                // 5.2 - и --
                 if (ch == '-')
                 {
                     int start = i;
@@ -107,14 +128,13 @@ namespace GUI.Scanner
                         continue;
                     }
 
-                    // одиночный '-'
                     i++;
                     col++;
                     result.Add(MakeLexeme(CODE_OPERATOR, "оператор", "-", line, startCol, col - 1, start, 1));
                     continue;
                 }
 
-                // 5.2 >=
+                // 5.3 > и >=
                 if (ch == '>')
                 {
                     int start = i;
@@ -134,8 +154,68 @@ namespace GUI.Scanner
                     continue;
                 }
 
-                // 5.3 Односимвольные операторы/разделители
-                if (IsSingleCharToken(ch, out int code, out string type))
+                // 5.4 < и <=
+                if (ch == '<')
+                {
+                    int start = i;
+                    int startCol = col;
+
+                    if (i + 1 < text.Length && text[i + 1] == '=')
+                    {
+                        i += 2;
+                        col += 2;
+                        result.Add(MakeLexeme(CODE_OPERATOR, "оператор", "<=", line, startCol, col - 1, start, 2));
+                        continue;
+                    }
+
+                    i++;
+                    col++;
+                    result.Add(MakeLexeme(CODE_OPERATOR, "оператор", "<", line, startCol, col - 1, start, 1));
+                    continue;
+                }
+
+                // 5.5 = и ==
+                if (ch == '=')
+                {
+                    int start = i;
+                    int startCol = col;
+
+                    if (i + 1 < text.Length && text[i + 1] == '=')
+                    {
+                        i += 2;
+                        col += 2;
+                        result.Add(MakeLexeme(CODE_OPERATOR, "оператор", "==", line, startCol, col - 1, start, 2));
+                        continue;
+                    }
+
+                    i++;
+                    col++;
+                    result.Add(MakeLexeme(CODE_OPERATOR, "оператор", "=", line, startCol, col - 1, start, 1));
+                    continue;
+                }
+
+                // 5.6 ! и !=
+                if (ch == '!')
+                {
+                    int start = i;
+                    int startCol = col;
+
+                    if (i + 1 < text.Length && text[i + 1] == '=')
+                    {
+                        i += 2;
+                        col += 2;
+                        result.Add(MakeLexeme(CODE_OPERATOR, "оператор", "!=", line, startCol, col - 1, start, 2));
+                        continue;
+                    }
+
+                    i++;
+                    col++;
+                    result.Add(MakeLexeme(CODE_OPERATOR, "оператор", "!", line, startCol, col - 1, start, 1));
+                    continue;
+                }
+
+                // 5.7 * и /
+                if (ch == '*' || ch == '/')
                 {
                     int start = i;
                     int startCol = col;
@@ -143,7 +223,20 @@ namespace GUI.Scanner
                     i++;
                     col++;
 
-                    result.Add(MakeLexeme(code, type, ch.ToString(), line, startCol, col - 1, start, 1));
+                    result.Add(MakeLexeme(CODE_OPERATOR, "оператор", ch.ToString(), line, startCol, col - 1, start, 1));
+                    continue;
+                }
+
+                // 5.8 Разделители
+                if (ch == '{' || ch == '}' || ch == '(' || ch == ')' || ch == ';')
+                {
+                    int start = i;
+                    int startCol = col;
+
+                    i++;
+                    col++;
+
+                    result.Add(MakeLexeme(CODE_SEPARATOR, "разделитель", ch.ToString(), line, startCol, col - 1, start, 1));
                     continue;
                 }
 

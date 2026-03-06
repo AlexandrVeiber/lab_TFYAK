@@ -184,7 +184,8 @@
                           RowHeaderWidth="0"
                           AlternatingRowBackground="#FAFAFA"
                           BorderBrush="#DDDDDD"
-                          BorderThickness="1">
+                          BorderThickness="1"
+                          MouseDoubleClick="LexemesGrid_MouseDoubleClick">
 
                     <DataGrid.Columns>
                         <DataGridTextColumn Header="Код"
