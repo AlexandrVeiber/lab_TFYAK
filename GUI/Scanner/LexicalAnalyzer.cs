@@ -34,14 +34,52 @@ namespace GUI.Scanner
                     continue;
                 }
 
-                // --- 2) Пробелы/табы/CR ---
-                if (ch == ' ' || ch == '\t' || ch == '\r')
+                // --- 2) Пробелы, табуляция, CR ---
+                if (ch == ' ')
                 {
-                    while (i < text.Length && (text[i] == ' ' || text[i] == '\t' || text[i] == '\r'))
-                    {
-                        i++;
-                        col++;
-                    }
+                    int start = i;
+                    int startCol = col;
+
+                    i++;
+                    col++;
+
+                    result.Add(MakeLexeme(
+                        CODE_WHITESPACE,
+                        "разделитель (пробел)",
+                        "(пробел)",
+                        line,
+                        startCol,
+                        startCol,
+                        start,
+                        1));
+
+                    continue;
+                }
+
+                if (ch == '\t')
+                {
+                    int start = i;
+                    int startCol = col;
+
+                    i++;
+                    col++;
+
+                    result.Add(MakeLexeme(
+                        CODE_WHITESPACE,
+                        "разделитель (табуляция)",
+                        "(табуляция)",
+                        line,
+                        startCol,
+                        startCol,
+                        start,
+                        1));
+
+                    continue;
+                }
+
+                if (ch == '\r')
+                {
+                    i++;
                     continue;
                 }
 

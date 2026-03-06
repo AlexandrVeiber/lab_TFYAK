@@ -259,7 +259,7 @@ namespace GUI
             LexemesGrid.ItemsSource = null;
             LexemesGrid.Items.Clear();
 
-            if (string.IsNullOrWhiteSpace(text))
+            if (string.IsNullOrEmpty(text))
             {
                 StatusTextBlock.Text = "Текст пустой.";
                 MessageBox.Show("Текст пустой.");
