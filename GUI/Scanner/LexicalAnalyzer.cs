@@ -25,7 +25,7 @@ namespace GUI.Scanner
             {
                 char ch = text[i];
 
-                // --- 1) Перевод строки ---
+                // 1) Перевод строки
                 if (ch == '\n')
                 {
                     i++;
@@ -34,7 +34,7 @@ namespace GUI.Scanner
                     continue;
                 }
 
-                // --- 2) Пробелы, табуляция, CR ---
+                // 2) Пробел
                 if (ch == ' ')
                 {
                     int start = i;
@@ -56,6 +56,7 @@ namespace GUI.Scanner
                     continue;
                 }
 
+                // 3) Табуляция
                 if (ch == '\t')
                 {
                     int start = i;
@@ -77,13 +78,14 @@ namespace GUI.Scanner
                     continue;
                 }
 
+                // 4) Возврат каретки
                 if (ch == '\r')
                 {
                     i++;
                     continue;
                 }
 
-                // --- 3) Идентификатор или ключевое слово ---
+                // 5) Идентификатор или ключевое слово
                 if (IsLetter(ch) || ch == '_')
                 {
                     int start = i;
@@ -92,25 +94,44 @@ namespace GUI.Scanner
                     i++;
                     col++;
 
-                    while (i < text.Length && (IsLetter(text[i]) || IsDigit(text[i]) || text[i] == '_'))
+                    while (i < text.Length &&
+                           (IsLetter(text[i]) || IsDigit(text[i]) || text[i] == '_'))
                     {
                         i++;
                         col++;
                     }
 
                     string word = text.Substring(start, i - start);
+
                     if (word == "do" || word == "while")
                     {
-                        result.Add(MakeLexeme(CODE_KEYWORD, "ключевое слово", word, line, startCol, col - 1, start, word.Length));
+                        result.Add(MakeLexeme(
+                            CODE_KEYWORD,
+                            "ключевое слово",
+                            word,
+                            line,
+                            startCol,
+                            col - 1,
+                            start,
+                            word.Length));
                     }
                     else
                     {
-                        result.Add(MakeLexeme(CODE_ID, "идентификатор", word, line, startCol, col - 1, start, word.Length));
+                        result.Add(MakeLexeme(
+                            CODE_ID,
+                            "идентификатор",
+                            word,
+                            line,
+                            startCol,
+                            col - 1,
+                            start,
+                            word.Length));
                     }
+
                     continue;
                 }
 
-                // --- 4) Число (целое без знака) ---
+                // 6) Число
                 if (IsDigit(ch))
                 {
                     int start = i;
@@ -126,171 +147,263 @@ namespace GUI.Scanner
                     }
 
                     string num = text.Substring(start, i - start);
-                    result.Add(MakeLexeme(CODE_NUMBER, "целое без знака", num, line, startCol, col - 1, start, num.Length));
+
+                    result.Add(MakeLexeme(
+                        CODE_NUMBER,
+                        "целое без знака",
+                        num,
+                        line,
+                        startCol,
+                        col - 1,
+                        start,
+                        num.Length));
+
                     continue;
                 }
 
-                // --- 5) Операторы и разделители ---
+                // 7) Операторы и разделители
+                int tokenStart = i;
+                int tokenStartCol = col;
 
-                // 5.1 + и ++
-                if (ch == '+')
+                switch (ch)
                 {
-                    int start = i;
-                    int startCol = col;
-
-                    if (i + 1 < text.Length && text[i + 1] == '+')
-                    {
-                        i += 2;
-                        col += 2;
-                        result.Add(MakeLexeme(CODE_OPERATOR, "оператор", "++", line, startCol, col - 1, start, 2));
+                    case '+':
+                        if (i + 1 < text.Length && text[i + 1] == '+')
+                        {
+                            i += 2;
+                            col += 2;
+                            result.Add(MakeLexeme(
+                                CODE_OPERATOR,
+                                "оператор",
+                                "++",
+                                line,
+                                tokenStartCol,
+                                col - 1,
+                                tokenStart,
+                                2));
+                        }
+                        else
+                        {
+                            i++;
+                            col++;
+                            result.Add(MakeLexeme(
+                                CODE_OPERATOR,
+                                "оператор",
+                                "+",
+                                line,
+                                tokenStartCol,
+                                col - 1,
+                                tokenStart,
+                                1));
+                        }
                         continue;
-                    }
 
-                    i++;
-                    col++;
-                    result.Add(MakeLexeme(CODE_OPERATOR, "оператор", "+", line, startCol, col - 1, start, 1));
-                    continue;
-                }
-
-                // 5.2 - и --
-                if (ch == '-')
-                {
-                    int start = i;
-                    int startCol = col;
-
-                    if (i + 1 < text.Length && text[i + 1] == '-')
-                    {
-                        i += 2;
-                        col += 2;
-                        result.Add(MakeLexeme(CODE_OPERATOR, "оператор", "--", line, startCol, col - 1, start, 2));
+                    case '-':
+                        if (i + 1 < text.Length && text[i + 1] == '-')
+                        {
+                            i += 2;
+                            col += 2;
+                            result.Add(MakeLexeme(
+                                CODE_OPERATOR,
+                                "оператор",
+                                "--",
+                                line,
+                                tokenStartCol,
+                                col - 1,
+                                tokenStart,
+                                2));
+                        }
+                        else
+                        {
+                            i++;
+                            col++;
+                            result.Add(MakeLexeme(
+                                CODE_OPERATOR,
+                                "оператор",
+                                "-",
+                                line,
+                                tokenStartCol,
+                                col - 1,
+                                tokenStart,
+                                1));
+                        }
                         continue;
-                    }
 
-                    i++;
-                    col++;
-                    result.Add(MakeLexeme(CODE_OPERATOR, "оператор", "-", line, startCol, col - 1, start, 1));
-                    continue;
-                }
-
-                // 5.3 > и >=
-                if (ch == '>')
-                {
-                    int start = i;
-                    int startCol = col;
-
-                    if (i + 1 < text.Length && text[i + 1] == '=')
-                    {
-                        i += 2;
-                        col += 2;
-                        result.Add(MakeLexeme(CODE_OPERATOR, "оператор", ">=", line, startCol, col - 1, start, 2));
+                    case '>':
+                        if (i + 1 < text.Length && text[i + 1] == '=')
+                        {
+                            i += 2;
+                            col += 2;
+                            result.Add(MakeLexeme(
+                                CODE_OPERATOR,
+                                "оператор",
+                                ">=",
+                                line,
+                                tokenStartCol,
+                                col - 1,
+                                tokenStart,
+                                2));
+                        }
+                        else
+                        {
+                            i++;
+                            col++;
+                            result.Add(MakeLexeme(
+                                CODE_OPERATOR,
+                                "оператор",
+                                ">",
+                                line,
+                                tokenStartCol,
+                                col - 1,
+                                tokenStart,
+                                1));
+                        }
                         continue;
-                    }
 
-                    i++;
-                    col++;
-                    result.Add(MakeLexeme(CODE_OPERATOR, "оператор", ">", line, startCol, col - 1, start, 1));
-                    continue;
-                }
-
-                // 5.4 < и <=
-                if (ch == '<')
-                {
-                    int start = i;
-                    int startCol = col;
-
-                    if (i + 1 < text.Length && text[i + 1] == '=')
-                    {
-                        i += 2;
-                        col += 2;
-                        result.Add(MakeLexeme(CODE_OPERATOR, "оператор", "<=", line, startCol, col - 1, start, 2));
+                    case '<':
+                        if (i + 1 < text.Length && text[i + 1] == '=')
+                        {
+                            i += 2;
+                            col += 2;
+                            result.Add(MakeLexeme(
+                                CODE_OPERATOR,
+                                "оператор",
+                                "<=",
+                                line,
+                                tokenStartCol,
+                                col - 1,
+                                tokenStart,
+                                2));
+                        }
+                        else
+                        {
+                            i++;
+                            col++;
+                            result.Add(MakeLexeme(
+                                CODE_OPERATOR,
+                                "оператор",
+                                "<",
+                                line,
+                                tokenStartCol,
+                                col - 1,
+                                tokenStart,
+                                1));
+                        }
                         continue;
-                    }
 
-                    i++;
-                    col++;
-                    result.Add(MakeLexeme(CODE_OPERATOR, "оператор", "<", line, startCol, col - 1, start, 1));
-                    continue;
-                }
-
-                // 5.5 = и ==
-                if (ch == '=')
-                {
-                    int start = i;
-                    int startCol = col;
-
-                    if (i + 1 < text.Length && text[i + 1] == '=')
-                    {
-                        i += 2;
-                        col += 2;
-                        result.Add(MakeLexeme(CODE_OPERATOR, "оператор", "==", line, startCol, col - 1, start, 2));
+                    case '=':
+                        if (i + 1 < text.Length && text[i + 1] == '=')
+                        {
+                            i += 2;
+                            col += 2;
+                            result.Add(MakeLexeme(
+                                CODE_OPERATOR,
+                                "оператор",
+                                "==",
+                                line,
+                                tokenStartCol,
+                                col - 1,
+                                tokenStart,
+                                2));
+                        }
+                        else
+                        {
+                            i++;
+                            col++;
+                            result.Add(MakeLexeme(
+                                CODE_OPERATOR,
+                                "оператор",
+                                "=",
+                                line,
+                                tokenStartCol,
+                                col - 1,
+                                tokenStart,
+                                1));
+                        }
                         continue;
-                    }
 
-                    i++;
-                    col++;
-                    result.Add(MakeLexeme(CODE_OPERATOR, "оператор", "=", line, startCol, col - 1, start, 1));
-                    continue;
-                }
-
-                // 5.6 ! и !=
-                if (ch == '!')
-                {
-                    int start = i;
-                    int startCol = col;
-
-                    if (i + 1 < text.Length && text[i + 1] == '=')
-                    {
-                        i += 2;
-                        col += 2;
-                        result.Add(MakeLexeme(CODE_OPERATOR, "оператор", "!=", line, startCol, col - 1, start, 2));
+                    case '!':
+                        if (i + 1 < text.Length && text[i + 1] == '=')
+                        {
+                            i += 2;
+                            col += 2;
+                            result.Add(MakeLexeme(
+                                CODE_OPERATOR,
+                                "оператор",
+                                "!=",
+                                line,
+                                tokenStartCol,
+                                col - 1,
+                                tokenStart,
+                                2));
+                        }
+                        else
+                        {
+                            i++;
+                            col++;
+                            result.Add(MakeLexeme(
+                                CODE_OPERATOR,
+                                "оператор",
+                                "!",
+                                line,
+                                tokenStartCol,
+                                col - 1,
+                                tokenStart,
+                                1));
+                        }
                         continue;
-                    }
 
-                    i++;
-                    col++;
-                    result.Add(MakeLexeme(CODE_OPERATOR, "оператор", "!", line, startCol, col - 1, start, 1));
-                    continue;
-                }
+                    case '*':
+                    case '/':
+                        i++;
+                        col++;
+                        result.Add(MakeLexeme(
+                            CODE_OPERATOR,
+                            "оператор",
+                            ch.ToString(),
+                            line,
+                            tokenStartCol,
+                            col - 1,
+                            tokenStart,
+                            1));
+                        continue;
 
-                // 5.7 * и /
-                if (ch == '*' || ch == '/')
-                {
-                    int start = i;
-                    int startCol = col;
+                    case '{':
+                    case '}':
+                    case '(':
+                    case ')':
+                    case ';':
+                        i++;
+                        col++;
+                        result.Add(MakeLexeme(
+                            CODE_SEPARATOR,
+                            "разделитель",
+                            ch.ToString(),
+                            line,
+                            tokenStartCol,
+                            col - 1,
+                            tokenStart,
+                            1));
+                        continue;
 
-                    i++;
-                    col++;
+                    default:
+                        i++;
+                        col++;
 
-                    result.Add(MakeLexeme(CODE_OPERATOR, "оператор", ch.ToString(), line, startCol, col - 1, start, 1));
-                    continue;
-                }
+                        var lex = MakeLexeme(
+                            CODE_ERROR,
+                            "ошибка",
+                            ch.ToString(),
+                            line,
+                            tokenStartCol,
+                            tokenStartCol,
+                            tokenStart,
+                            1);
 
-                // 5.8 Разделители
-                if (ch == '{' || ch == '}' || ch == '(' || ch == ')' || ch == ';')
-                {
-                    int start = i;
-                    int startCol = col;
-
-                    i++;
-                    col++;
-
-                    result.Add(MakeLexeme(CODE_SEPARATOR, "разделитель", ch.ToString(), line, startCol, col - 1, start, 1));
-                    continue;
-                }
-
-                // --- 6) Иначе — ошибка (недопустимый символ) ---
-                {
-                    int start = i;
-                    int startCol = col;
-
-                    i++;
-                    col++;
-
-                    string bad = ch.ToString();
-                    var lex = MakeLexeme(CODE_ERROR, "ошибка", bad, line, startCol, startCol, start, 1);
-                    lex.IsError = true;
-                    lex.Type = "ошибка: недопустимый символ";
-                    result.Add(lex);
+                        lex.IsError = true;
+                        lex.Type = "ошибка: недопустимый символ";
+                        result.Add(lex);
+                        continue;
                 }
             }
 
@@ -316,33 +429,5 @@ namespace GUI.Scanner
 
         private static bool IsDigit(char c) =>
             (c >= '0' && c <= '9');
-
-        private static bool IsSingleCharToken(char ch, out int code, out string type)
-        {
-            code = 0;
-            type = "";
-            
-            switch (ch)
-            {
-                case '{':
-                case '}':
-                case '(':
-                case ')':
-                case ';':
-                    code = 5;
-                    type = "разделитель";
-                    return true;
-
-                case '=':
-                case '+':
-                case '*':
-                case '/':
-                    code = 4;
-                    type = "оператор";
-                    return true;
-            }
-
-            return false;
-        }
     }
 }

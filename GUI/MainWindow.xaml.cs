@@ -283,11 +283,10 @@ namespace GUI
             }
         }
 
-        private void LexemesGrid_MouseDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        private void LexemesGrid_MouseLeftButtonUp(object sender, System.Windows.Input.MouseButtonEventArgs e)
         {
             if (LexemesGrid.SelectedItem is GUI.Scanner.Lexeme lex)
             {
-                // Переходим только по ошибкам
                 if (!lex.IsError)
                     return;
 
