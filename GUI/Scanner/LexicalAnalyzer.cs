@@ -1,16 +1,40 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
+using System.Numerics;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace GUI.Scanner
 {
     public class LexicalAnalyzer
     {
+        // --- Уникальные коды лексем ---
         private const int CODE_NUMBER = 1;
-        private const int CODE_ID = 2;
-        private const int CODE_KEYWORD = 3;
-        private const int CODE_OPERATOR = 4;
-        private const int CODE_SEPARATOR = 5;
-        private const int CODE_WHITESPACE = 6;
+        private const int CODE_IDENTIFIER = 2;
+
+        private const int CODE_DO = 3;
+        private const int CODE_WHILE = 4;
+
+        private const int CODE_PLUS = 5;
+        private const int CODE_INCREMENT = 6;
+        private const int CODE_MINUS = 7;
+        private const int CODE_DECREMENT = 8;
+        private const int CODE_MULTIPLY = 9;
+        private const int CODE_DIVIDE = 10;
+        private const int CODE_ASSIGN = 11;
+        private const int CODE_EQUAL = 12;
+
+        private const int CODE_GREATER = 13;
+        private const int CODE_GREATER_OR_EQUAL = 14;
+        private const int CODE_LESS = 15;
+        private const int CODE_LESS_OR_EQUAL = 16;
+        private const int CODE_NOT_EQUAL = 17;
+
+        private const int CODE_LBRACE = 18;
+        private const int CODE_RBRACE = 19;
+        private const int CODE_LPAREN = 20;
+        private const int CODE_RPAREN = 21;
+        private const int CODE_SEMICOLON = 22;
+
+        private const int CODE_WHITESPACE = 23;
         private const int CODE_ERROR = 99;
 
         public List<Lexeme> Analyze(string text)
@@ -25,7 +49,14 @@ namespace GUI.Scanner
             {
                 char ch = text[i];
 
-                // 1) Перевод строки
+                // Игнорируем \r
+                if (ch == '\r')
+                {
+                    i++;
+                    continue;
+                }
+
+                // Перевод строки
                 if (ch == '\n')
                 {
                     i++;
@@ -34,58 +65,71 @@ namespace GUI.Scanner
                     continue;
                 }
 
-                // 2) Пробел
-                if (ch == ' ')
+                // Пробелы / табы
+                if (ch == ' ' || ch == '\t')
                 {
                     int start = i;
+                    int startLine = line;
                     int startCol = col;
 
-                    i++;
-                    col++;
+                    bool hadNewLineInside = false;
 
-                    result.Add(MakeLexeme(
-                        CODE_WHITESPACE,
-                        "разделитель (пробел)",
-                        "(пробел)",
-                        line,
-                        startCol,
-                        startCol,
-                        start,
-                        1));
+                    while (i < text.Length)
+                    {
+                        if (text[i] == '\r')
+                        {
+                            i++;
+                            continue;
+                        }
+
+                        if (text[i] == '\n')
+                        {
+                            i++;
+                            line++;
+                            col = 1;
+                            hadNewLineInside = true;
+                            continue;
+                        }
+
+                        if (text[i] == ' ')
+                        {
+                            i++;
+                            col++;
+                            continue;
+                        }
+
+                        if (text[i] == '\t')
+                        {
+                            i++;
+                            col += 4;
+                            continue;
+                        }
+
+                        break;
+                    }
+
+                    bool hasPreviousLexeme = result.Count > 0;
+                    bool hasNextMeaningful = i < text.Length && IsMeaningfulStart(text[i]);
+
+                    bool previousLexemeOnSameLine = hasPreviousLexeme && result[^1].Line == startLine;
+
+                    if (hasPreviousLexeme && previousLexemeOnSameLine && hasNextMeaningful && !hadNewLineInside)
+                    {
+                        result.Add(MakeLexeme(
+                            CODE_WHITESPACE,
+                            "разделитель (пробел)",
+                            "(пробел)",
+                            startLine,
+                            startCol,
+                            startCol,
+                            start,
+                            1));
+                    }
 
                     continue;
                 }
 
-                // 3) Табуляция
-                if (ch == '\t')
-                {
-                    int start = i;
-                    int startCol = col;
-
-                    i++;
-                    col++;
-
-                    result.Add(MakeLexeme(
-                        CODE_WHITESPACE,
-                        "разделитель (табуляция)",
-                        "(табуляция)",
-                        line,
-                        startCol,
-                        startCol,
-                        start,
-                        1));
-
-                    continue;
-                }
-
-                // 4) Возврат каретки
-                if (ch == '\r')
-                {
-                    i++;
-                    continue;
-                }
-
-                // 5) Идентификатор или ключевое слово
+                // Идентификаторы / ключевые слова
                 if (IsLetter(ch) || ch == '_')
                 {
                     int start = i;
@@ -103,11 +147,23 @@ namespace GUI.Scanner
 
                     string word = text.Substring(start, i - start);
 
-                    if (word == "do" || word == "while")
+                    if (word == "do")
                     {
                         result.Add(MakeLexeme(
-                            CODE_KEYWORD,
-                            "ключевое слово",
+                            CODE_DO,
+                            "ключевое слово do",
+                            word,
+                            line,
+                            startCol,
+                            col - 1,
+                            start,
+                            word.Length));
+                    }
+                    else if (word == "while")
+                    {
+                        result.Add(MakeLexeme(
+                            CODE_WHILE,
+                            "ключевое слово while",
                             word,
                             line,
                             startCol,
@@ -118,7 +174,7 @@ namespace GUI.Scanner
                     else
                     {
                         result.Add(MakeLexeme(
-                            CODE_ID,
+                            CODE_IDENTIFIER,
                             "идентификатор",
                             word,
                             line,
@@ -131,7 +187,7 @@ namespace GUI.Scanner
                     continue;
                 }
 
-                // 6) Число
+                // Числа
                 if (IsDigit(ch))
                 {
                     int start = i;
@@ -161,7 +217,7 @@ namespace GUI.Scanner
                     continue;
                 }
 
-                // 7) Операторы и разделители
+                // Операторы и разделители
                 int tokenStart = i;
                 int tokenStartCol = col;
 
@@ -173,8 +229,8 @@ namespace GUI.Scanner
                             i += 2;
                             col += 2;
                             result.Add(MakeLexeme(
-                                CODE_OPERATOR,
-                                "оператор",
+                                CODE_INCREMENT,
+                                "оператор инкремента",
                                 "++",
                                 line,
                                 tokenStartCol,
@@ -187,8 +243,8 @@ namespace GUI.Scanner
                             i++;
                             col++;
                             result.Add(MakeLexeme(
-                                CODE_OPERATOR,
-                                "оператор",
+                                CODE_PLUS,
+                                "оператор сложения",
                                 "+",
                                 line,
                                 tokenStartCol,
@@ -204,8 +260,8 @@ namespace GUI.Scanner
                             i += 2;
                             col += 2;
                             result.Add(MakeLexeme(
-                                CODE_OPERATOR,
-                                "оператор",
+                                CODE_DECREMENT,
+                                "оператор декремента",
                                 "--",
                                 line,
                                 tokenStartCol,
@@ -218,9 +274,68 @@ namespace GUI.Scanner
                             i++;
                             col++;
                             result.Add(MakeLexeme(
-                                CODE_OPERATOR,
-                                "оператор",
+                                CODE_MINUS,
+                                "оператор вычитания",
                                 "-",
+                                line,
+                                tokenStartCol,
+                                col - 1,
+                                tokenStart,
+                                1));
+                        }
+                        continue;
+
+                    case '*':
+                        i++;
+                        col++;
+                        result.Add(MakeLexeme(
+                            CODE_MULTIPLY,
+                            "оператор умножения",
+                            "*",
+                            line,
+                            tokenStartCol,
+                            col - 1,
+                            tokenStart,
+                            1));
+                        continue;
+
+                    case '/':
+                        i++;
+                        col++;
+                        result.Add(MakeLexeme(
+                            CODE_DIVIDE,
+                            "оператор деления",
+                            "/",
+                            line,
+                            tokenStartCol,
+                            col - 1,
+                            tokenStart,
+                            1));
+                        continue;
+
+                    case '=':
+                        if (i + 1 < text.Length && text[i + 1] == '=')
+                        {
+                            i += 2;
+                            col += 2;
+                            result.Add(MakeLexeme(
+                                CODE_EQUAL,
+                                "оператор равенства",
+                                "==",
+                                line,
+                                tokenStartCol,
+                                col - 1,
+                                tokenStart,
+                                2));
+                        }
+                        else
+                        {
+                            i++;
+                            col++;
+                            result.Add(MakeLexeme(
+                                CODE_ASSIGN,
+                                "оператор присваивания",
+                                "=",
                                 line,
                                 tokenStartCol,
                                 col - 1,
@@ -235,8 +350,8 @@ namespace GUI.Scanner
                             i += 2;
                             col += 2;
                             result.Add(MakeLexeme(
-                                CODE_OPERATOR,
-                                "оператор",
+                                CODE_GREATER_OR_EQUAL,
+                                "оператор сравнения больше либо равно",
                                 ">=",
                                 line,
                                 tokenStartCol,
@@ -249,8 +364,8 @@ namespace GUI.Scanner
                             i++;
                             col++;
                             result.Add(MakeLexeme(
-                                CODE_OPERATOR,
-                                "оператор",
+                                CODE_GREATER,
+                                "оператор сравнения больше",
                                 ">",
                                 line,
                                 tokenStartCol,
@@ -266,8 +381,8 @@ namespace GUI.Scanner
                             i += 2;
                             col += 2;
                             result.Add(MakeLexeme(
-                                CODE_OPERATOR,
-                                "оператор",
+                                CODE_LESS_OR_EQUAL,
+                                "оператор сравнения меньше либо равно",
                                 "<=",
                                 line,
                                 tokenStartCol,
@@ -280,40 +395,9 @@ namespace GUI.Scanner
                             i++;
                             col++;
                             result.Add(MakeLexeme(
-                                CODE_OPERATOR,
-                                "оператор",
+                                CODE_LESS,
+                                "оператор сравнения меньше",
                                 "<",
-                                line,
-                                tokenStartCol,
-                                col - 1,
-                                tokenStart,
-                                1));
-                        }
-                        continue;
-
-                    case '=':
-                        if (i + 1 < text.Length && text[i + 1] == '=')
-                        {
-                            i += 2;
-                            col += 2;
-                            result.Add(MakeLexeme(
-                                CODE_OPERATOR,
-                                "оператор",
-                                "==",
-                                line,
-                                tokenStartCol,
-                                col - 1,
-                                tokenStart,
-                                2));
-                        }
-                        else
-                        {
-                            i++;
-                            col++;
-                            result.Add(MakeLexeme(
-                                CODE_OPERATOR,
-                                "оператор",
-                                "=",
                                 line,
                                 tokenStartCol,
                                 col - 1,
@@ -328,8 +412,8 @@ namespace GUI.Scanner
                             i += 2;
                             col += 2;
                             result.Add(MakeLexeme(
-                                CODE_OPERATOR,
-                                "оператор",
+                                CODE_NOT_EQUAL,
+                                "оператор сравнения не равно",
                                 "!=",
                                 line,
                                 tokenStartCol,
@@ -342,25 +426,25 @@ namespace GUI.Scanner
                             i++;
                             col++;
                             result.Add(MakeLexeme(
-                                CODE_OPERATOR,
-                                "оператор",
+                                CODE_ERROR,
+                                "ошибка: недопустимый символ",
                                 "!",
                                 line,
                                 tokenStartCol,
-                                col - 1,
+                                tokenStartCol,
                                 tokenStart,
-                                1));
+                                1,
+                                true));
                         }
                         continue;
 
-                    case '*':
-                    case '/':
+                    case '{':
                         i++;
                         col++;
                         result.Add(MakeLexeme(
-                            CODE_OPERATOR,
-                            "оператор",
-                            ch.ToString(),
+                            CODE_LBRACE,
+                            "открывающая фигурная скобка",
+                            "{",
                             line,
                             tokenStartCol,
                             col - 1,
@@ -368,17 +452,55 @@ namespace GUI.Scanner
                             1));
                         continue;
 
-                    case '{':
                     case '}':
+                        i++;
+                        col++;
+                        result.Add(MakeLexeme(
+                            CODE_RBRACE,
+                            "закрывающая фигурная скобка",
+                            "}",
+                            line,
+                            tokenStartCol,
+                            col - 1,
+                            tokenStart,
+                            1));
+                        continue;
+
                     case '(':
+                        i++;
+                        col++;
+                        result.Add(MakeLexeme(
+                            CODE_LPAREN,
+                            "открывающая круглая скобка",
+                            "(",
+                            line,
+                            tokenStartCol,
+                            col - 1,
+                            tokenStart,
+                            1));
+                        continue;
+
                     case ')':
+                        i++;
+                        col++;
+                        result.Add(MakeLexeme(
+                            CODE_RPAREN,
+                            "закрывающая круглая скобка",
+                            ")",
+                            line,
+                            tokenStartCol,
+                            col - 1,
+                            tokenStart,
+                            1));
+                        continue;
+
                     case ';':
                         i++;
                         col++;
                         result.Add(MakeLexeme(
-                            CODE_SEPARATOR,
-                            "разделитель",
-                            ch.ToString(),
+                            CODE_SEMICOLON,
+                            "конец оператора",
+                            ";",
                             line,
                             tokenStartCol,
                             col - 1,
@@ -389,20 +511,16 @@ namespace GUI.Scanner
                     default:
                         i++;
                         col++;
-
-                        var lex = MakeLexeme(
+                        result.Add(MakeLexeme(
                             CODE_ERROR,
-                            "ошибка",
+                            "ошибка: недопустимый символ",
                             ch.ToString(),
                             line,
                             tokenStartCol,
                             tokenStartCol,
                             tokenStart,
-                            1);
-
-                        lex.IsError = true;
-                        lex.Type = "ошибка: недопустимый символ";
-                        result.Add(lex);
+                            1,
+                            true));
                         continue;
                 }
             }
@@ -410,7 +528,16 @@ namespace GUI.Scanner
             return result;
         }
 
-        private static Lexeme MakeLexeme(int code, string type, string text, int line, int colFrom, int colTo, int startIndex, int length)
+        private static Lexeme MakeLexeme(
+            int code,
+            string type,
+            string text,
+            int line,
+            int colFrom,
+            int colTo,
+            int startIndex,
+            int length,
+            bool isError = false)
         {
             return new Lexeme
             {
@@ -420,14 +547,30 @@ namespace GUI.Scanner
                 Location = $"строка {line}, {colFrom}-{colTo}",
                 StartIndex = startIndex,
                 Length = length,
-                IsError = false
+                IsError = isError,
+                Line = line,
+                ColumnFrom = colFrom,
+                ColumnTo = colTo
             };
         }
 
-        private static bool IsLetter(char c) =>
-            (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z');
+        private static bool IsMeaningfulStart(char c)
+        {
+            return IsLetter(c) || IsDigit(c) || c == '_' ||
+                   c == '+' || c == '-' || c == '*' || c == '/' ||
+                   c == '=' || c == '>' || c == '<' || c == '!' ||
+                   c == '{' || c == '}' || c == '(' || c == ')' || c == ';';
+        }
 
-        private static bool IsDigit(char c) =>
-            (c >= '0' && c <= '9');
+        private static bool IsLetter(char c)
+        {
+            return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z');
+        }
+
+        private static bool IsDigit(char c)
+        {
+            return c >= '0' && c <= '9';
+        }
     }
+    
 }

@@ -4,6 +4,8 @@ using System.ComponentModel;
 using System.IO;
 using System.Linq;
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
 
 namespace GUI
 {
@@ -28,7 +30,7 @@ namespace GUI
             Title = "GUI — " + fileName + (_isDirty ? "*" : "");
         }
 
-        private void EditorTextBox_TextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e)
+        private void EditorTextBox_TextChanged(object sender, TextChangedEventArgs e)
         {
             _isDirty = true;
             UpdateTitle();
@@ -37,11 +39,14 @@ namespace GUI
         // ---------- Файл ----------
         private void FileNew_Click(object sender, RoutedEventArgs e)
         {
-            if (!AskSaveIfNeeded()) return;
+            if (!AskSaveIfNeeded())
+                return;
 
             EditorTextBox.Clear();
             LexemesGrid.ItemsSource = null;
+            LexemesGrid.Items.Clear();
             StatusTextBlock.Text = "Создан новый документ.";
+
             _currentFilePath = null;
             _isDirty = false;
             UpdateTitle();
@@ -49,10 +54,13 @@ namespace GUI
 
         private void FileOpen_Click(object sender, RoutedEventArgs e)
         {
-            if (!AskSaveIfNeeded()) return;
+            if (!AskSaveIfNeeded())
+                return;
 
-            OpenFileDialog dlg = new OpenFileDialog();
-            dlg.Filter = "Текстовые файлы (*.txt)|*.txt|Все файлы (*.*)|*.*";
+            OpenFileDialog dlg = new OpenFileDialog
+            {
+                Filter = "Текстовые файлы (*.txt)|*.txt|Все файлы (*.*)|*.*"
+            };
 
             if (dlg.ShowDialog() == true)
             {
@@ -62,6 +70,7 @@ namespace GUI
                 UpdateTitle();
 
                 LexemesGrid.ItemsSource = null;
+                LexemesGrid.Items.Clear();
                 StatusTextBlock.Text = "Открыт файл: " + dlg.FileName;
             }
         }
@@ -82,9 +91,11 @@ namespace GUI
 
         private void FileSaveAs_Click(object sender, RoutedEventArgs e)
         {
-            SaveFileDialog dlg = new SaveFileDialog();
-            dlg.Filter = "Текстовые файлы (*.txt)|*.txt|Все файлы (*.*)|*.*";
-            dlg.FileName = _currentFilePath == null ? "document.txt" : Path.GetFileName(_currentFilePath);
+            SaveFileDialog dlg = new SaveFileDialog
+            {
+                Filter = "Текстовые файлы (*.txt)|*.txt|Все файлы (*.*)|*.*",
+                FileName = _currentFilePath == null ? "document.txt" : Path.GetFileName(_currentFilePath)
+            };
 
             if (dlg.ShowDialog() == true)
             {
@@ -109,7 +120,8 @@ namespace GUI
 
         private bool AskSaveIfNeeded()
         {
-            if (!_isDirty) return true;
+            if (!_isDirty)
+                return true;
 
             var res = MessageBox.Show(
                 "Есть несохранённые изменения. Сохранить?",
@@ -117,8 +129,11 @@ namespace GUI
                 MessageBoxButton.YesNoCancel,
                 MessageBoxImage.Question);
 
-            if (res == MessageBoxResult.Cancel) return false;
-            if (res == MessageBoxResult.Yes) return TrySave();
+            if (res == MessageBoxResult.Cancel)
+                return false;
+
+            if (res == MessageBoxResult.Yes)
+                return TrySave();
 
             return true;
         }
@@ -129,11 +144,15 @@ namespace GUI
             {
                 if (_currentFilePath == null)
                 {
-                    SaveFileDialog dlg = new SaveFileDialog();
-                    dlg.Filter = "Текстовые файлы (*.txt)|*.txt|Все файлы (*.*)|*.*";
-                    dlg.FileName = "document.txt";
+                    SaveFileDialog dlg = new SaveFileDialog
+                    {
+                        Filter = "Текстовые файлы (*.txt)|*.txt|Все файлы (*.*)|*.*",
+                        FileName = "document.txt"
+                    };
 
-                    if (dlg.ShowDialog() != true) return false;
+                    if (dlg.ShowDialog() != true)
+                        return false;
+
                     _currentFilePath = dlg.FileName;
                 }
 
@@ -153,12 +172,14 @@ namespace GUI
         // ---------- Правка ----------
         private void EditUndo_Click(object sender, RoutedEventArgs e)
         {
-            if (EditorTextBox.CanUndo) EditorTextBox.Undo();
+            if (EditorTextBox.CanUndo)
+                EditorTextBox.Undo();
         }
 
         private void EditRedo_Click(object sender, RoutedEventArgs e)
         {
-            if (EditorTextBox.CanRedo) EditorTextBox.Redo();
+            if (EditorTextBox.CanRedo)
+                EditorTextBox.Redo();
         }
 
         private void EditCut_Click(object sender, RoutedEventArgs e)
@@ -255,7 +276,6 @@ namespace GUI
         {
             string text = EditorTextBox.Text;
 
-            // Полностью очищаем таблицу перед новым выводом
             LexemesGrid.ItemsSource = null;
             LexemesGrid.Items.Clear();
 
@@ -283,28 +303,56 @@ namespace GUI
             }
         }
 
-        private void LexemesGrid_MouseLeftButtonUp(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        private void LexemesGrid_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         {
-            if (LexemesGrid.SelectedItem is GUI.Scanner.Lexeme lex)
-            {
-                if (!lex.IsError)
-                    return;
+            HighlightSelectedLexeme();
+        }
 
-                int index = lex.StartIndex;
+        private void LexemesGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            HighlightSelectedLexeme();
+        }
 
-                if (index < 0)
-                    index = 0;
+        private void HighlightSelectedLexeme()
+        {
+            if (LexemesGrid.SelectedItem is not GUI.Scanner.Lexeme lex)
+                return;
 
-                if (index > EditorTextBox.Text.Length)
-                    index = EditorTextBox.Text.Length;
+            int index = lex.StartIndex;
 
-                EditorTextBox.Focus();
-                EditorTextBox.Select(index, Math.Max(lex.Length, 1));
+            if (index < 0)
+                index = 0;
 
-                int lineIndex = EditorTextBox.GetLineIndexFromCharacterIndex(index);
-                EditorTextBox.ScrollToLine(lineIndex);
+            if (index > EditorTextBox.Text.Length)
+                index = EditorTextBox.Text.Length;
 
+            int length = Math.Max(lex.Length, 1);
+
+            if (index + length > EditorTextBox.Text.Length)
+                length = EditorTextBox.Text.Length - index;
+
+            if (length < 0)
+                length = 0;
+
+            EditorTextBox.Focus();
+            EditorTextBox.Select(index, length);
+
+            int lineIndex = EditorTextBox.GetLineIndexFromCharacterIndex(index);
+            EditorTextBox.ScrollToLine(lineIndex);
+
+            if (lex.IsError)
                 StatusTextBlock.Text = $"Переход к ошибке: {lex.Location}";
+            else
+                StatusTextBlock.Text = $"Выделена лексема: {lex.Text} ({lex.Location})";
+        }
+
+        private void EditorTextBox_PreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Tab)
+            {
+                EditorTextBox.SelectedText = "    ";
+                EditorTextBox.CaretIndex = EditorTextBox.SelectionStart;
+                e.Handled = true;
             }
         }
 

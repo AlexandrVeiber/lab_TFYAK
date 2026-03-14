@@ -5,22 +5,18 @@
         MinHeight="450" MinWidth="700"
         Closing="Window_Closing">
 
-    <!-- Горячие клавиши -->
     <Window.InputBindings>
         <KeyBinding Key="Z" Modifiers="Control" Command="{x:Static ApplicationCommands.Undo}" />
         <KeyBinding Key="Y" Modifiers="Control" Command="{x:Static ApplicationCommands.Redo}" />
-
         <KeyBinding Key="X" Modifiers="Control" Command="{x:Static ApplicationCommands.Cut}" />
         <KeyBinding Key="C" Modifiers="Control" Command="{x:Static ApplicationCommands.Copy}" />
         <KeyBinding Key="V" Modifiers="Control" Command="{x:Static ApplicationCommands.Paste}" />
-
         <KeyBinding Key="A" Modifiers="Control" Command="{x:Static ApplicationCommands.SelectAll}" />
         <KeyBinding Key="Delete" Command="{x:Static ApplicationCommands.Delete}" />
     </Window.InputBindings>
 
     <DockPanel>
 
-        <!-- Меню -->
         <Menu DockPanel.Dock="Top">
             <MenuItem Header="_Файл">
                 <MenuItem Header="Создать" Click="FileNew_Click"/>
@@ -62,7 +58,6 @@
             </MenuItem>
         </Menu>
 
-        <!-- Панель инструментов -->
         <ToolBarTray DockPanel.Dock="Top">
             <ToolBar>
                 <Button Style="{StaticResource ToolBtn}" ToolTip="Создать" Click="FileNew_Click">
@@ -119,7 +114,6 @@
             </ToolBar>
         </ToolBarTray>
 
-        <!-- Основная область -->
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="*" />
@@ -127,17 +121,17 @@
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
 
-            <!-- Верх: редактор -->
             <TextBox x:Name="EditorTextBox"
                      Grid.Row="0"
                      AcceptsReturn="True"
-                     AcceptsTab="True"
+                     AcceptsTab="False"
                      VerticalScrollBarVisibility="Auto"
                      HorizontalScrollBarVisibility="Auto"
                      FontFamily="Consolas"
                      FontSize="14"
                      Margin="6"
-                     TextChanged="EditorTextBox_TextChanged">
+                     TextChanged="EditorTextBox_TextChanged"
+                     PreviewKeyDown="EditorTextBox_PreviewKeyDown">
 
                 <TextBox.CommandBindings>
                     <CommandBinding Command="ApplicationCommands.Undo" Executed="EditUndo_Click"/>
@@ -150,16 +144,13 @@
                 </TextBox.CommandBindings>
             </TextBox>
 
-            <!-- Разделитель -->
             <GridSplitter Grid.Row="1"
                           Height="6"
                           HorizontalAlignment="Stretch"
                           Background="#DDD"
                           ShowsPreview="True"/>
 
-            <!-- Низ: статус + таблица -->
             <DockPanel Grid.Row="2" Margin="6">
-
                 <Border DockPanel.Dock="Top"
                         Padding="8,4"
                         Background="#F5F5F5"
@@ -185,7 +176,8 @@
                           AlternatingRowBackground="#FAFAFA"
                           BorderBrush="#DDDDDD"
                           BorderThickness="1"
-                          MouseLeftButtonUp="LexemesGrid_MouseLeftButtonUp">
+                          MouseLeftButtonUp="LexemesGrid_MouseLeftButtonUp"
+                          SelectionChanged="LexemesGrid_SelectionChanged">
 
                     <DataGrid.Columns>
                         <DataGridTextColumn Header="Код"
