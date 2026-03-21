@@ -151,6 +151,22 @@
                           ShowsPreview="True"/>
 
             <DockPanel Grid.Row="2" Margin="6">
+                <StackPanel DockPanel.Dock="Top"
+                            Orientation="Horizontal"
+                            Margin="0,0,0,6">
+                    <TextBlock Text="Режим анализа:"
+                               VerticalAlignment="Center"
+                               Margin="0,0,8,0"/>
+
+                    <ComboBox x:Name="AnalysisModeComboBox"
+                              Width="220"
+                              SelectionChanged="AnalysisModeComboBox_SelectionChanged">
+                        <ComboBoxItem Content="Только лексический"/>
+                        <ComboBoxItem Content="Только синтаксический"/>
+                        <ComboBoxItem Content="Оба сразу"/>
+                    </ComboBox>
+                </StackPanel>
+
                 <Border DockPanel.Dock="Top"
                         Padding="8,4"
                         Background="#F5F5F5"
@@ -177,30 +193,7 @@
                           BorderBrush="#DDDDDD"
                           BorderThickness="1"
                           MouseLeftButtonUp="LexemesGrid_MouseLeftButtonUp"
-                          SelectionChanged="LexemesGrid_SelectionChanged">
-
-                    <DataGrid.Columns>
-                        <DataGridTextColumn Header="Код"
-                                            Binding="{Binding Code}"
-                                            Width="Auto"
-                                            MinWidth="60"/>
-
-                        <DataGridTextColumn Header="Тип"
-                                            Binding="{Binding Type}"
-                                            Width="2*"
-                                            MinWidth="170"/>
-
-                        <DataGridTextColumn Header="Лексема"
-                                            Binding="{Binding Text}"
-                                            Width="*"
-                                            MinWidth="120"/>
-
-                        <DataGridTextColumn Header="Позиция"
-                                            Binding="{Binding Location}"
-                                            Width="Auto"
-                                            MinWidth="150"/>
-                    </DataGrid.Columns>
-                </DataGrid>
+                          SelectionChanged="LexemesGrid_SelectionChanged"/>
             </DockPanel>
         </Grid>
     </DockPanel>

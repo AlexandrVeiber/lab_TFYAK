@@ -173,12 +173,39 @@ namespace GUI.Syntax
 
         private void BODY()
         {
-            if (!MatchText("{", "Ожидался символ { после do"))
+            if (CheckText("{"))
             {
-                RecoveryTo("{", "}", "while");
-                if (CheckText("{"))
-                    Next();
+                Next();
+                STMT_LIST();
+                return;
             }
+
+            AddError(Current, "Ожидался символ { после do");
+
+            // Если после do уже идет начало оператора,
+            // то считаем, что { просто пропущена,
+            // и продолжаем разбор тела без грубого перескока.
+            if (CheckIdentifier())
+            {
+                STMT_LIST();
+                return;
+            }
+
+            // Если сразу встретили }, while или конец,
+            // то оставляем текущий токен на месте —
+            // STMT_LIST / следующие правила сами обработают ситуацию.
+            if (CheckText("}") || CheckText("while") || Current == null)
+            {
+                STMT_LIST();
+                return;
+            }
+
+            // Только если встретился совсем посторонний токен,
+            // тогда уже переходим к восстановлению.
+            RecoveryTo("{", "}", "while");
+
+            if (CheckText("{"))
+                Next();
 
             STMT_LIST();
         }
