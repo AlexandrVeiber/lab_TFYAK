@@ -1,6 +1,4 @@
 ﻿using System.Collections.Generic;
-using System.Numerics;
-using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace GUI.Scanner
 {
@@ -35,6 +33,14 @@ namespace GUI.Scanner
         private const int CODE_SEMICOLON = 22;
 
         private const int CODE_WHITESPACE = 23;
+
+        private const int CODE_AND = 24;
+        private const int CODE_OR = 25;
+        private const int CODE_BIT_OR = 26;
+        private const int CODE_LOGICAL_OR = 27;
+        private const int CODE_BIT_AND = 28;
+        private const int CODE_LOGICAL_AND = 29;
+
         private const int CODE_ERROR = 99;
 
         public List<Lexeme> Analyze(string text)
@@ -110,7 +116,6 @@ namespace GUI.Scanner
 
                     bool hasPreviousLexeme = result.Count > 0;
                     bool hasNextMeaningful = i < text.Length && IsMeaningfulStart(text[i]);
-
                     bool previousLexemeOnSameLine = hasPreviousLexeme && result[^1].Line == startLine;
 
                     if (hasPreviousLexeme && previousLexemeOnSameLine && hasNextMeaningful && !hadNewLineInside)
@@ -129,60 +134,73 @@ namespace GUI.Scanner
                     continue;
                 }
 
-                // Идентификаторы / ключевые слова
+                // Идентификаторы / ключевые слова / искажённые ключевые слова
                 if (IsLetter(ch) || ch == '_')
                 {
                     int start = i;
                     int startCol = col;
 
-                    i++;
-                    col++;
-
-                    while (i < text.Length &&
-                           (IsLetter(text[i]) || IsDigit(text[i]) || text[i] == '_'))
+                    while (i < text.Length && IsIdentifierPart(text[i]))
                     {
                         i++;
                         col++;
                     }
 
-                    string word = text.Substring(start, i - start);
+                    string prefix = text.Substring(start, i - start);
 
-                    if (word == "do")
+                    // Обычное завершение слова на границе лексемы
+                    if (i >= text.Length || IsWordBoundary(text[i]))
+                    {
+                        result.Add(MakeWordLexeme(prefix, line, startCol, start));
+                        continue;
+                    }
+
+                    // Если уже собрано полное ключевое слово,
+                    // то завершаем его как нормальную лексему,
+                    // а мусор после него обработается отдельно.
+                    if (TryGetKeywordInfo(prefix, out int keywordCode, out string keywordType))
                     {
                         result.Add(MakeLexeme(
-                            CODE_DO,
-                            "ключевое слово do",
-                            word,
+                            keywordCode,
+                            keywordType,
+                            prefix,
                             line,
                             startCol,
                             col - 1,
                             start,
-                            word.Length));
+                            prefix.Length));
+
+                        continue;
                     }
-                    else if (word == "while")
+
+                    // Ищем случай искажённого ключевого слова:
+                    // whi$#le, d$o, a#nd, o%r
+                    if (TryReadBrokenKeyword(
+                        text,
+                        start,
+                        prefix,
+                        line,
+                        startCol,
+                        out Lexeme brokenLexeme,
+                        out int newIndex,
+                        out int newCol))
                     {
-                        result.Add(MakeLexeme(
-                            CODE_WHILE,
-                            "ключевое слово while",
-                            word,
-                            line,
-                            startCol,
-                            col - 1,
-                            start,
-                            word.Length));
+                        i = newIndex;
+                        col = newCol;
+                        result.Add(brokenLexeme);
+                        continue;
                     }
-                    else
-                    {
-                        result.Add(MakeLexeme(
-                            CODE_IDENTIFIER,
-                            "идентификатор",
-                            word,
-                            line,
-                            startCol,
-                            col - 1,
-                            start,
-                            word.Length));
-                    }
+
+                    // Обычный идентификатор, а недопустимые символы дальше пойдут отдельно
+                    result.Add(MakeLexeme(
+                        CODE_IDENTIFIER,
+                        "идентификатор",
+                        prefix,
+                        line,
+                        startCol,
+                        col - 1,
+                        start,
+                        prefix.Length));
 
                     continue;
                 }
@@ -438,6 +456,68 @@ namespace GUI.Scanner
                         }
                         continue;
 
+                    case '|':
+                        if (i + 1 < text.Length && text[i + 1] == '|')
+                        {
+                            i += 2;
+                            col += 2;
+                            result.Add(MakeLexeme(
+                                CODE_LOGICAL_OR,
+                                "логическое ИЛИ",
+                                "||",
+                                line,
+                                tokenStartCol,
+                                col - 1,
+                                tokenStart,
+                                2));
+                        }
+                        else
+                        {
+                            i++;
+                            col++;
+                            result.Add(MakeLexeme(
+                                CODE_BIT_OR,
+                                "побитовое ИЛИ",
+                                "|",
+                                line,
+                                tokenStartCol,
+                                col - 1,
+                                tokenStart,
+                                1));
+                        }
+                        continue;
+
+                    case '&':
+                        if (i + 1 < text.Length && text[i + 1] == '&')
+                        {
+                            i += 2;
+                            col += 2;
+                            result.Add(MakeLexeme(
+                                CODE_LOGICAL_AND,
+                                "логическое И",
+                                "&&",
+                                line,
+                                tokenStartCol,
+                                col - 1,
+                                tokenStart,
+                                2));
+                        }
+                        else
+                        {
+                            i++;
+                            col++;
+                            result.Add(MakeLexeme(
+                                CODE_BIT_AND,
+                                "побитовое И",
+                                "&",
+                                line,
+                                tokenStartCol,
+                                col - 1,
+                                tokenStart,
+                                1));
+                        }
+                        continue;
+
                     case '{':
                         i++;
                         col++;
@@ -509,19 +589,31 @@ namespace GUI.Scanner
                         continue;
 
                     default:
-                        i++;
-                        col++;
-                        result.Add(MakeLexeme(
-                            CODE_ERROR,
-                            "ошибка: недопустимый символ",
-                            ch.ToString(),
-                            line,
-                            tokenStartCol,
-                            tokenStartCol,
-                            tokenStart,
-                            1,
-                            true));
-                        continue;
+                        {
+                            int errorStart = i;
+                            int errorStartCol = col;
+
+                            while (i < text.Length && IsInvalidFragmentChar(text[i]))
+                            {
+                                i++;
+                                col++;
+                            }
+
+                            string fragment = text.Substring(errorStart, i - errorStart);
+
+                            result.Add(MakeLexeme(
+                                CODE_ERROR,
+                                "ошибка: недопустимый фрагмент",
+                                fragment,
+                                line,
+                                errorStartCol,
+                                col - 1,
+                                errorStart,
+                                fragment.Length,
+                                true));
+
+                            continue;
+                        }
                 }
             }
 
@@ -554,11 +646,163 @@ namespace GUI.Scanner
             };
         }
 
+        private static Lexeme MakeWordLexeme(string word, int line, int startCol, int startIndex)
+        {
+            if (TryGetKeywordInfo(word, out int code, out string type))
+            {
+                return MakeLexeme(
+                    code,
+                    type,
+                    word,
+                    line,
+                    startCol,
+                    startCol + word.Length - 1,
+                    startIndex,
+                    word.Length);
+            }
+
+            return MakeLexeme(
+                CODE_IDENTIFIER,
+                "идентификатор",
+                word,
+                line,
+                startCol,
+                startCol + word.Length - 1,
+                startIndex,
+                word.Length);
+        }
+
+        private static bool TryGetKeywordInfo(string word, out int code, out string type)
+        {
+            switch (word)
+            {
+                case "do":
+                    code = CODE_DO;
+                    type = "ключевое слово do";
+                    return true;
+
+                case "while":
+                    code = CODE_WHILE;
+                    type = "ключевое слово while";
+                    return true;
+
+                case "and":
+                    code = CODE_AND;
+                    type = "ключевое слово and";
+                    return true;
+
+                case "or":
+                    code = CODE_OR;
+                    type = "ключевое слово or";
+                    return true;
+
+                default:
+                    code = 0;
+                    type = "";
+                    return false;
+            }
+        }
+
+        private static bool TryReadBrokenKeyword(
+            string text,
+            int startIndex,
+            string prefix,
+            int line,
+            int startCol,
+            out Lexeme lexeme,
+            out int newIndex,
+            out int newCol)
+        {
+            lexeme = null!;
+            newIndex = startIndex;
+            newCol = startCol;
+
+            // Склеиваем только случай, когда уже есть правильное начало ключевого слова,
+            // но само ключевое слово ещё не закончено: w, wh, whi, d, a, an, o
+            if (!IsProperKeywordPrefix(prefix))
+                return false;
+
+            int j = startIndex + prefix.Length;
+            int currentCol = startCol + prefix.Length;
+
+            while (j < text.Length && !IsWordBoundary(text[j]))
+            {
+                j++;
+                currentCol++;
+            }
+
+            string fragment = text.Substring(startIndex, j - startIndex);
+            string cleaned = ExtractIdentifierChars(fragment);
+
+            if (!TryGetKeywordInfo(cleaned, out _, out _))
+                return false;
+
+            if (cleaned.Length <= prefix.Length)
+                return false;
+
+            lexeme = MakeLexeme(
+                CODE_ERROR,
+                $"ошибка: искажено ключевое слово {cleaned}",
+                fragment,
+                line,
+                startCol,
+                currentCol - 1,
+                startIndex,
+                fragment.Length,
+                true);
+
+            newIndex = j;
+            newCol = currentCol;
+            return true;
+        }
+
+        private static string ExtractIdentifierChars(string text)
+        {
+            var chars = new List<char>();
+
+            foreach (char c in text)
+            {
+                if (IsIdentifierPart(c))
+                    chars.Add(c);
+            }
+
+            return new string(chars.ToArray());
+        }
+
+        private static bool IsProperKeywordPrefix(string text)
+        {
+            return ("do".StartsWith(text) && text != "do") ||
+                   ("while".StartsWith(text) && text != "while") ||
+                   ("and".StartsWith(text) && text != "and") ||
+                   ("or".StartsWith(text) && text != "or");
+        }
+
+        private static bool IsIdentifierPart(char c)
+        {
+            return IsLetter(c) || IsDigit(c) || c == '_';
+        }
+
+        private static bool IsWordBoundary(char c)
+        {
+            return c == ' ' || c == '\t' || c == '\r' || c == '\n' ||
+                   c == '+' || c == '-' || c == '*' || c == '/' ||
+                   c == '=' || c == '>' || c == '<' || c == '!' ||
+                   c == '|' || c == '&' ||
+                   c == '{' || c == '}' || c == '(' || c == ')' || c == ';';
+        }
+
+        private static bool IsInvalidFragmentChar(char c)
+        {
+            return c != ' ' && c != '\t' && c != '\r' && c != '\n' &&
+                   !IsMeaningfulStart(c);
+        }
+
         private static bool IsMeaningfulStart(char c)
         {
             return IsLetter(c) || IsDigit(c) || c == '_' ||
                    c == '+' || c == '-' || c == '*' || c == '/' ||
                    c == '=' || c == '>' || c == '<' || c == '!' ||
+                   c == '|' || c == '&' ||
                    c == '{' || c == '}' || c == '(' || c == ')' || c == ';';
         }
 
@@ -572,5 +816,4 @@ namespace GUI.Scanner
             return c >= '0' && c <= '9';
         }
     }
-    
 }
