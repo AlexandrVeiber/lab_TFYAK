@@ -155,26 +155,8 @@ namespace GUI.Scanner
                         continue;
                     }
 
-                    // Если уже собрано полное ключевое слово,
-                    // то завершаем его как нормальную лексему,
-                    // а мусор после него обработается отдельно.
-                    if (TryGetKeywordInfo(prefix, out int keywordCode, out string keywordType))
-                    {
-                        result.Add(MakeLexeme(
-                            keywordCode,
-                            keywordType,
-                            prefix,
-                            line,
-                            startCol,
-                            col - 1,
-                            start,
-                            prefix.Length));
-
-                        continue;
-                    }
-
-                    // Ищем случай искажённого ключевого слова:
-                    // whi$#le, d$o, a#nd, o%r
+                    // 1. Случай неполного префикса:
+                    //    whi$#le, d$o, a#nd, o%r
                     if (TryReadBrokenKeyword(
                         text,
                         start,
@@ -191,7 +173,41 @@ namespace GUI.Scanner
                         continue;
                     }
 
-                    // Обычный идентификатор, а недопустимые символы дальше пойдут отдельно
+                    // 2. Случай полного ключевого слова с испорченным хвостом:
+                    //    while$, do#, and%, or@
+                    if (TryReadBrokenKeywordTail(
+                        text,
+                        start,
+                        prefix,
+                        line,
+                        startCol,
+                        out brokenLexeme,
+                        out newIndex,
+                        out newCol))
+                    {
+                        i = newIndex;
+                        col = newCol;
+                        result.Add(brokenLexeme);
+                        continue;
+                    }
+
+                    // 3. Нормальное ключевое слово
+                    if (TryGetKeywordInfo(prefix, out int keywordCode, out string keywordType))
+                    {
+                        result.Add(MakeLexeme(
+                            keywordCode,
+                            keywordType,
+                            prefix,
+                            line,
+                            startCol,
+                            col - 1,
+                            start,
+                            prefix.Length));
+
+                        continue;
+                    }
+
+                    // 4. Обычный идентификатор
                     result.Add(MakeLexeme(
                         CODE_IDENTIFIER,
                         "идентификатор",
@@ -456,67 +472,119 @@ namespace GUI.Scanner
                         }
                         continue;
 
-                    case '|':
-                        if (i + 1 < text.Length && text[i + 1] == '|')
-                        {
-                            i += 2;
-                            col += 2;
-                            result.Add(MakeLexeme(
-                                CODE_LOGICAL_OR,
-                                "логическое ИЛИ",
-                                "||",
-                                line,
-                                tokenStartCol,
-                                col - 1,
-                                tokenStart,
-                                2));
-                        }
-                        else
-                        {
-                            i++;
-                            col++;
-                            result.Add(MakeLexeme(
-                                CODE_BIT_OR,
-                                "побитовое ИЛИ",
-                                "|",
-                                line,
-                                tokenStartCol,
-                                col - 1,
-                                tokenStart,
-                                1));
-                        }
-                        continue;
-
                     case '&':
-                        if (i + 1 < text.Length && text[i + 1] == '&')
                         {
-                            i += 2;
-                            col += 2;
-                            result.Add(MakeLexeme(
-                                CODE_LOGICAL_AND,
-                                "логическое И",
-                                "&&",
-                                line,
-                                tokenStartCol,
-                                col - 1,
-                                tokenStart,
-                                2));
+                            int j = i;
+                            while (j < text.Length && text[j] == '&')
+                                j++;
+
+                            int count = j - i;
+
+                            if (count == 1)
+                            {
+                                i++;
+                                col++;
+                                result.Add(MakeLexeme(
+                                    CODE_BIT_AND,
+                                    "побитовое И",
+                                    "&",
+                                    line,
+                                    tokenStartCol,
+                                    col - 1,
+                                    tokenStart,
+                                    1));
+                            }
+                            else if (count == 2)
+                            {
+                                i += 2;
+                                col += 2;
+                                result.Add(MakeLexeme(
+                                    CODE_LOGICAL_AND,
+                                    "логическое И",
+                                    "&&",
+                                    line,
+                                    tokenStartCol,
+                                    col - 1,
+                                    tokenStart,
+                                    2));
+                            }
+                            else
+                            {
+                                string fragment = text.Substring(i, count);
+                                i = j;
+                                col += count;
+
+                                result.Add(MakeLexeme(
+                                    CODE_ERROR,
+                                    "ошибка: недопустимая последовательность символов &",
+                                    fragment,
+                                    line,
+                                    tokenStartCol,
+                                    col - 1,
+                                    tokenStart,
+                                    fragment.Length,
+                                    true));
+                            }
+
+                            continue;
                         }
-                        else
+
+                    case '|':
                         {
-                            i++;
-                            col++;
-                            result.Add(MakeLexeme(
-                                CODE_BIT_AND,
-                                "побитовое И",
-                                "&",
-                                line,
-                                tokenStartCol,
-                                col - 1,
-                                tokenStart,
-                                1));
+                            int j = i;
+                            while (j < text.Length && text[j] == '|')
+                                j++;
+
+                            int count = j - i;
+
+                            if (count == 1)
+                            {
+                                i++;
+                                col++;
+                                result.Add(MakeLexeme(
+                                    CODE_BIT_OR,
+                                    "побитовое ИЛИ",
+                                    "|",
+                                    line,
+                                    tokenStartCol,
+                                    col - 1,
+                                    tokenStart,
+                                    1));
+                            }
+                            else if (count == 2)
+                            {
+                                i += 2;
+                                col += 2;
+                                result.Add(MakeLexeme(
+                                    CODE_LOGICAL_OR,
+                                    "логическое ИЛИ",
+                                    "||",
+                                    line,
+                                    tokenStartCol,
+                                    col - 1,
+                                    tokenStart,
+                                    2));
+                            }
+                            else
+                            {
+                                string fragment = text.Substring(i, count);
+                                i = j;
+                                col += count;
+
+                                result.Add(MakeLexeme(
+                                    CODE_ERROR,
+                                    "ошибка: недопустимая последовательность символов |",
+                                    fragment,
+                                    line,
+                                    tokenStartCol,
+                                    col - 1,
+                                    tokenStart,
+                                    fragment.Length,
+                                    true));
+                            }
+
+                            continue;
                         }
-                        continue;
 
                     case '{':
                         i++;
@@ -756,6 +824,54 @@ namespace GUI.Scanner
             return true;
         }
 
+        private static bool TryReadBrokenKeywordTail(
+            string text,
+            int startIndex,
+            string keyword,
+            int line,
+            int startCol,
+            out Lexeme lexeme,
+            out int newIndex,
+            out int newCol)
+        {
+            lexeme = null!;
+            newIndex = startIndex;
+            newCol = startCol;
+
+            if (!TryGetKeywordInfo(keyword, out _, out _))
+                return false;
+
+            int j = startIndex + keyword.Length;
+            int currentCol = startCol + keyword.Length;
+
+            // while$, do#, and%, or@
+            if (j >= text.Length || !IsInvalidFragmentChar(text[j]))
+                return false;
+
+            while (j < text.Length && IsInvalidFragmentChar(text[j]))
+            {
+                j++;
+                currentCol++;
+            }
+
+            string fragment = text.Substring(startIndex, j - startIndex);
+
+            lexeme = MakeLexeme(
+                CODE_ERROR,
+                $"ошибка: искажено ключевое слово {keyword}",
+                fragment,
+                line,
+                startCol,
+                currentCol - 1,
+                startIndex,
+                fragment.Length,
+                true);
+
+            newIndex = j;
+            newCol = currentCol;
+            return true;
+        }
+
         private static string ExtractIdentifierChars(string text)
         {
             var chars = new List<char>();
@@ -816,5 +932,4 @@ namespace GUI.Scanner
             return c >= '0' && c <= '9';
         }
     }
-
 }

@@ -10,31 +10,41 @@ namespace GUI.Syntax
         private int _position;
         private SyntaxParseResult _result = new();
 
+        private bool _suppressTrailingTextError;
+
         public SyntaxParseResult Analyze(List<Lexeme> lexemes)
         {
             _result = new SyntaxParseResult();
+            _suppressTrailingTextError = false;
 
-            // Пробелы для синтаксического анализа не нужны
+            bool hadLexicalErrors = lexemes.Any(t => t.IsError);
+
+            // Для синтаксического анализа берём только корректные непустые лексемы
             _tokens = lexemes
-                .Where(t => t.Code != 23)
+                .Where(t => t.Code != 23 && !t.IsError)
                 .ToList();
 
             _position = 0;
 
             if (_tokens.Count == 0)
             {
-                AddError(null, "Ожидалось ключевое слово do");
+                if (!hadLexicalErrors)
+                {
+                    AddError(null, "Ожидалось ключевое слово do");
+                }
+
                 SetFinalMessage();
                 return _result;
             }
 
             DW();
 
-            if (Current != null)
+            if (!_suppressTrailingTextError && Current != null)
             {
-                AddError(Current, "Лишний текст после конца конструкции do-while");
+                AddError(Current, "Лишний текст после конца конструкции do-while", 0);
             }
 
+            NormalizeErrors();
             SetFinalMessage();
             return _result;
         }
@@ -51,9 +61,9 @@ namespace GUI.Syntax
         private void SetFinalMessage()
         {
             if (_result.Success)
-                _result.Message = "Синтаксический анализ завершён. Ошибок нет.";
+                _result.Message = "Синтаксический анализ завершён. Ошибок нет. Общее количество найденных ошибок: 0.";
             else
-                _result.Message = $"Синтаксический анализ завершён. Найдено ошибок: {_result.Errors.Count}.";
+                _result.Message = $"Синтаксический анализ завершён. Общее количество найденных ошибок: {_result.Errors.Count}.";
         }
 
         private bool CheckText(string text)
@@ -71,6 +81,11 @@ namespace GUI.Syntax
             return Current != null && Current.Type == "целое без знака";
         }
 
+        private bool CheckStatementStart()
+        {
+            return CheckIdentifier();
+        }
+
         private bool CheckRelOp()
         {
             if (Current == null)
@@ -84,7 +99,54 @@ namespace GUI.Syntax
                    Current.Text == "!=";
         }
 
-        private void AddError(Lexeme? lexeme, string description)
+        private bool CheckLogicalOp()
+        {
+            if (Current == null)
+                return false;
+
+            return Current.Text == "and" ||
+                   Current.Text == "or" ||
+                   Current.Text == "&&" ||
+                   Current.Text == "||";
+        }
+
+        private bool IsStopToken(string stopToken)
+        {
+            return stopToken switch
+            {
+                "<stmt>" => CheckStatementStart(),
+                "<relop>" => CheckRelOp(),
+                "<logicop>" => CheckLogicalOp(),
+                "id" => CheckIdentifier(),
+                "num" => CheckNumber(),
+                _ => CheckText(stopToken)
+            };
+        }
+
+        private void RecoveryTo(params string[] stopTokens)
+        {
+            while (Current != null && !stopTokens.Any(IsStopToken))
+            {
+                Next();
+            }
+        }
+
+        private bool IsFactorFollow()
+        {
+            return Current == null ||
+                   CheckText(")") ||
+                   CheckText(";") ||
+                   CheckText("+") ||
+                   CheckText("-") ||
+                   CheckText("*") ||
+                   CheckText("/") ||
+                   CheckText("}") ||
+                   CheckText("while") ||
+                   CheckRelOp() ||
+                   CheckLogicalOp();
+        }
+
+        private void AddError(Lexeme? lexeme, string description, int priority = 0)
         {
             if (lexeme == null)
             {
@@ -109,17 +171,10 @@ namespace GUI.Syntax
                     Length = 0,
                     Line = line,
                     ColumnFrom = column,
-                    ColumnTo = column
+                    ColumnTo = column,
+                    Priority = priority
                 });
 
-                return;
-            }
-
-            var lastError = _result.Errors.LastOrDefault();
-            if (lastError != null &&
-                lastError.StartIndex == lexeme.StartIndex &&
-                lastError.Description == description)
-            {
                 return;
             }
 
@@ -132,40 +187,103 @@ namespace GUI.Syntax
                 Length = lexeme.Length,
                 Line = lexeme.Line,
                 ColumnFrom = lexeme.ColumnFrom,
-                ColumnTo = lexeme.ColumnTo
+                ColumnTo = lexeme.ColumnTo,
+                Priority = priority
             });
         }
 
-        private bool MatchText(string text, string errorDescription)
+        private void NormalizeErrors()
+        {
+            var normalized = _result.Errors
+                .OrderBy(e => e.Line)
+                .ThenBy(e => e.ColumnFrom)
+                .ThenByDescending(e => e.Priority)
+                .ToList();
+
+            var unique = new List<SyntaxErrorInfo>();
+
+            foreach (var err in normalized)
+            {
+                if (unique.Count == 0)
+                {
+                    unique.Add(err);
+                    continue;
+                }
+
+                var last = unique[^1];
+
+                if (last.StartIndex == err.StartIndex)
+                {
+                    if (err.Priority > last.Priority)
+                        unique[^1] = err;
+
+                    continue;
+                }
+
+                unique.Add(err);
+            }
+
+            _result.Errors.Clear();
+            _result.Errors.AddRange(unique);
+        }
+
+        /// <summary>
+        /// Пытается сопоставить ожидаемый терминал.
+        /// Если терминал отсутствует, фиксирует ошибку и
+        /// считает, что он был виртуально вставлен.
+        /// Текущая лексема при этом не потребляется.
+        /// </summary>
+        private void MatchOrInsert(string text, string errorDescription, int priority = 2)
         {
             if (CheckText(text))
             {
                 Next();
-                return true;
+                return;
             }
 
-            AddError(Current, errorDescription);
-            return false;
+            AddError(Current, errorDescription, priority);
         }
 
-        // Нейтрализация ошибки: переходим к ближайшему допустимому символу
-        private void RecoveryTo(params string[] stopTokens)
+        /// <summary>
+        /// Проверка операции отношения.
+        /// Если её нет, считаем, что она была виртуально вставлена.
+        /// </summary>
+        private void REL_OP()
         {
-            while (Current != null && !stopTokens.Contains(Current.Text))
+            if (CheckRelOp())
             {
                 Next();
+                return;
             }
+
+            AddError(Current, "Ожидалась операция сравнения", 2);
         }
 
         // ===== Нетерминалы =====
 
         private void DW()
         {
-            if (!MatchText("do", "Ожидалось ключевое слово do"))
+            if (CheckText("do"))
             {
-                RecoveryTo("do", "{", "while");
-                if (CheckText("do"))
-                    Next();
+                Next();
+                BODY();
+                return;
+            }
+
+            AddError(Current, "Ожидалось ключевое слово do");
+            RecoveryTo("do", "{", "<stmt>", "while");
+
+            if (CheckText("do"))
+            {
+                Next();
+                BODY();
+                return;
+            }
+
+            if (CheckText("while") || Current == null)
+            {
+                _suppressTrailingTextError = true;
+                return;
             }
 
             BODY();
@@ -175,96 +293,118 @@ namespace GUI.Syntax
         {
             if (CheckText("{"))
             {
-                Next();
-                STMT_LIST();
+                BLOCK();
+                WHILE_PART();
                 return;
             }
 
-            AddError(Current, "Ожидался символ { после do");
-
-            // Если после do уже идет начало оператора,
-            // то считаем, что { просто пропущена,
-            // и продолжаем разбор тела без грубого перескока.
-            if (CheckIdentifier())
+            if (CheckStatementStart())
             {
-                STMT_LIST();
+                STMT();
+                WHILE_PART();
                 return;
             }
 
-            // Если сразу встретили }, while или конец,
-            // то оставляем текущий токен на месте —
-            // STMT_LIST / следующие правила сами обработают ситуацию.
-            if (CheckText("}") || CheckText("while") || Current == null)
+            if (CheckText("while"))
             {
-                STMT_LIST();
+                AddError(Current, "Ожидалось тело цикла: блок { ... } или оператор");
+                WHILE_PART();
                 return;
             }
 
-            // Только если встретился совсем посторонний токен,
-            // тогда уже переходим к восстановлению.
-            RecoveryTo("{", "}", "while");
+            AddError(Current, "Ожидалось тело цикла: блок { ... } или оператор");
+            RecoveryTo("{", "<stmt>", "while");
 
             if (CheckText("{"))
+            {
+                BLOCK();
+                WHILE_PART();
+                return;
+            }
+
+            if (CheckStatementStart())
+            {
+                STMT();
+                WHILE_PART();
+                return;
+            }
+
+            if (CheckText("while"))
+            {
+                WHILE_PART();
+            }
+        }
+
+        private void BLOCK()
+        {
+            MatchOrInsert("{", "Ожидался символ {");
+            BLOCK_CONTENT();
+        }
+
+        private void BLOCK_CONTENT()
+        {
+            if (CheckText("}"))
+            {
                 Next();
+                return;
+            }
+
+            if (CheckText("while"))
+            {
+                AddError(Current, "Ожидался символ }");
+                return;
+            }
 
             STMT_LIST();
+            MatchOrInsert("}", "Ожидался символ }");
         }
 
         private void STMT_LIST()
         {
-            if (!CheckIdentifier())
-            {
-                AddError(Current, "Ожидался оператор в теле цикла");
-                RecoveryTo("}", "while");
-                if (CheckText("}"))
-                {
-                    Next();
-                    WHILE_PART();
-                }
-
-                return;
-            }
-
             STMT();
             STMT_LIST_TAIL();
         }
 
         private void STMT_LIST_TAIL()
         {
-            while (CheckIdentifier())
+            while (CheckStatementStart())
             {
                 STMT();
             }
 
-            if (CheckText("}"))
+            if (Current != null && !CheckText("}") && !CheckText("while"))
             {
-                Next();
-                WHILE_PART();
-                return;
+                AddError(Current, "Ожидался следующий оператор или символ }");
+                RecoveryTo("<stmt>", "}", "while");
+
+                while (CheckStatementStart())
+                {
+                    STMT();
+                }
             }
-
-            AddError(Current, "Ожидался символ } или следующий оператор");
-            RecoveryTo("}", "while");
-
-            if (CheckText("}"))
-                Next();
-
-            WHILE_PART();
         }
 
         private void STMT()
         {
-            if (!CheckIdentifier())
+            if (CheckIdentifier())
             {
-                AddError(Current, "Ожидался идентификатор в начале оператора");
-                RecoveryTo(";", "}", "while");
-                if (CheckText(";"))
-                    Next();
+                Next();
+                STMT_TAIL();
                 return;
             }
 
-            Next();
-            STMT_TAIL();
+            AddError(Current, "Ожидался идентификатор в начале оператора", 3);
+
+            if (CheckText(";"))
+            {
+                Next();
+                return;
+            }
+
+            RecoveryTo(";", "<stmt>", "}", "while");
+
+            if (CheckText(";"))
+                Next();
         }
 
         private void STMT_TAIL()
@@ -272,28 +412,14 @@ namespace GUI.Syntax
             if (CheckText("++"))
             {
                 Next();
-
-                if (!MatchText(";", "Ожидался символ ; после оператора ++"))
-                {
-                    RecoveryTo(";", "}", "while");
-                    if (CheckText(";"))
-                        Next();
-                }
-
+                MatchOrInsert(";", "Ожидался символ ; после оператора ++");
                 return;
             }
 
             if (CheckText("--"))
             {
                 Next();
-
-                if (!MatchText(";", "Ожидался символ ; после оператора --"))
-                {
-                    RecoveryTo(";", "}", "while");
-                    if (CheckText(";"))
-                        Next();
-                }
-
+                MatchOrInsert(";", "Ожидался символ ; после оператора --");
                 return;
             }
 
@@ -301,19 +427,12 @@ namespace GUI.Syntax
             {
                 Next();
                 EXPR();
-
-                if (!MatchText(";", "Ожидался символ ; после оператора присваивания"))
-                {
-                    RecoveryTo(";", "}", "while");
-                    if (CheckText(";"))
-                        Next();
-                }
-
+                MatchOrInsert(";", "Ожидался символ ; после оператора присваивания", 1);
                 return;
             }
 
-            AddError(Current, "Ожидались ++, -- или = после идентификатора");
-            RecoveryTo(";", "}", "while");
+            AddError(Current, "Ожидались ++, -- или = после идентификатора", 3);
+            RecoveryTo(";", "<stmt>", "}", "while");
 
             if (CheckText(";"))
                 Next();
@@ -321,62 +440,59 @@ namespace GUI.Syntax
 
         private void WHILE_PART()
         {
-            if (!MatchText("while", "Ожидалось ключевое слово while"))
-            {
-                RecoveryTo("while", "(", ";");
-                if (CheckText("while"))
-                    Next();
-            }
-
+            MatchOrInsert("while", "Ожидалось ключевое слово while");
             COND();
         }
 
         private void COND()
         {
-            if (!MatchText("(", "Ожидался символ ( после while"))
+            MatchOrInsert("(", "Ожидался символ ( после while");
+
+            if (Current == null)
             {
-                RecoveryTo("(", ")", ";", "<", "<=", ">", ">=", "==", "!=");
-                if (CheckText("("))
-                    Next();
+                AddError(null, "Ожидалось условие после while");
+                return;
             }
 
-            EXPR();
+            REL_EXPR();
+
+            if (Current == null)
+                return;
+
             COND_TAIL();
         }
 
         private void COND_TAIL()
         {
-            REL_OP();
-            EXPR();
-
-            if (!MatchText(")", "Ожидался символ ) после условия"))
+            while (CheckLogicalOp())
             {
-                RecoveryTo(")", ";");
-                if (CheckText(")"))
-                    Next();
+                LOGICAL_OP();
+                REL_EXPR();
+
+                if (Current == null)
+                    return;
             }
 
-            if (!MatchText(";", "Ожидался символ ; в конце конструкции do-while"))
-            {
-                RecoveryTo(";");
-                if (CheckText(";"))
-                    Next();
-            }
+            MatchOrInsert(")", "Ожидался символ ) после условия");
+            MatchOrInsert(";", "Ожидался символ ; в конце конструкции do-while");
         }
 
-        private void REL_OP()
+        private void LOGICAL_OP()
         {
-            if (CheckRelOp())
+            if (CheckLogicalOp())
             {
                 Next();
                 return;
             }
 
-            AddError(Current, "Ожидалась операция сравнения");
-            RecoveryTo("<", "<=", ">", ">=", "==", "!=", ")", ";");
+            AddError(Current, "Ожидалась логическая операция");
+        }
 
-            if (CheckRelOp())
-                Next();
+        private void REL_EXPR()
+        {
+            EXPR();
+            REL_OP();
+            EXPR();
         }
 
         private void EXPR()
@@ -421,19 +537,23 @@ namespace GUI.Syntax
             {
                 Next();
                 EXPR();
-
-                if (!MatchText(")", "Ожидался символ )"))
-                {
-                    RecoveryTo(")", ";", "+", "-", "*", "/", "<", "<=", ">", ">=", "==", "!=");
-                    if (CheckText(")"))
-                        Next();
-                }
-
+                MatchOrInsert(")", "Ожидался символ )");
                 return;
             }
 
-            AddError(Current, "Ожидались идентификатор, число или выражение в скобках");
-            RecoveryTo(";", ")", "+", "-", "*", "/", "<", "<=", ">", ">=", "==", "!=");
+            if (IsFactorFollow())
+            {
+                AddError(Current, "Ожидались идентификатор, число или выражение в скобках", 3);
+                return;
+            }
+
+            AddError(Current, "Ожидались идентификатор, число или выражение в скобках", 3);
+            RecoveryTo("id", "num", "(", ")", ";", "+", "-", "*", "/", "}", "while", "<relop>", "<logicop>");
+
+            if (CheckIdentifier() || CheckNumber() || CheckText("("))
+            {
+                FACTOR();
+            }
         }
     }
 }

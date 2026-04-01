@@ -467,14 +467,9 @@ namespace GUI
             ClearDiagnosticsGrid();
             ConfigureGridForCurrentMode();
 
-            if (string.IsNullOrWhiteSpace(text))
-            {
-                StatusTextBlock.Text = "Текст пустой.";
-                return;
-            }
-
             var scanner = new LexicalAnalyzer();
             var lexemes = scanner.Analyze(text);
+            lexemes = MergeAdjacentLexicalErrors(lexemes);
 
             var lexicalErrors = lexemes
                 .Where(l => l.IsError)
@@ -496,6 +491,59 @@ namespace GUI
             }
         }
 
+        private List<Lexeme> MergeAdjacentLexicalErrors(List<Lexeme> lexemes)
+        {
+            var merged = new List<Lexeme>();
+            int i = 0;
+
+            while (i < lexemes.Count)
+            {
+                if (!lexemes[i].IsError)
+                {
+                    merged.Add(lexemes[i]);
+                    i++;
+                    continue;
+                }
+
+                var start = lexemes[i];
+                string text = start.Text;
+                int startIndex = start.StartIndex;
+                int length = start.Length;
+                int line = start.Line;
+                int colFrom = start.ColumnFrom;
+                int colTo = start.ColumnTo;
+
+                int j = i + 1;
+                while (j < lexemes.Count &&
+                       lexemes[j].IsError &&
+                       lexemes[j].StartIndex == startIndex + length)
+                {
+                    text += lexemes[j].Text;
+                    length += lexemes[j].Length;
+                    colTo = lexemes[j].ColumnTo;
+                    j++;
+                }
+
+                merged.Add(new Lexeme
+                {
+                    Code = start.Code,
+                    Type = start.Type,
+                    Text = text,
+                    Location = $"строка {line}, {colFrom}-{colTo}",
+                    StartIndex = startIndex,
+                    Length = length,
+                    IsError = true,
+                    Line = line,
+                    ColumnFrom = colFrom,
+                    ColumnTo = colTo
+                });
+
+                i = j;
+            }
+
+            return merged;
+        }
+
         private void ShowLexerResult(List<Lexeme> lexemes)
         {
             ConfigureLexerColumns();
@@ -503,40 +551,36 @@ namespace GUI
 
             int errorCount = lexemes.Count(l => l.IsError);
 
-            if (errorCount == 0)
-            {
-                StatusTextBlock.Text =
-                    $"Лексический анализ завершён. Найдено лексем: {lexemes.Count}. Ошибок нет.";
-            }
-            else
-            {
-                StatusTextBlock.Text =
-                    $"Лексический анализ завершён. Найдено лексем: {lexemes.Count}. Ошибок: {errorCount}.";
-            }
+            StatusTextBlock.Text =
+                $"Лексический анализ завершён. Найдено лексем: {lexemes.Count}. " +
+                $"Общее количество найденных ошибок: {errorCount}.";
         }
 
         private void ShowParserResult(List<Lexeme> lexemes, List<Lexeme> lexicalErrors)
         {
             ConfigureParserColumns();
 
-            if (lexicalErrors.Count > 0)
-            {
-                var parserViewLexErrors = lexicalErrors
-                    .Select(ConvertLexicalErrorToSyntaxError)
-                    .ToList();
-
-                LexemesGrid.ItemsSource = parserViewLexErrors;
-                StatusTextBlock.Text =
-                    $"Лексический анализ завершён. Лексических ошибок: {parserViewLexErrors.Count}. " +
-                    "Синтаксический анализ не выполнялся.";
-                return;
-            }
-
             var syntaxAnalyzer = new SyntaxAnalyzer();
             var syntaxResult = syntaxAnalyzer.Analyze(lexemes);
 
-            LexemesGrid.ItemsSource = syntaxResult.Errors;
-            StatusTextBlock.Text = syntaxResult.Message;
+            var allErrors = lexicalErrors
+                .Select(ConvertLexicalErrorToSyntaxError)
+                .ToList();
+
+            allErrors.AddRange(syntaxResult.Errors);
+
+            LexemesGrid.ItemsSource = allErrors;
+
+            if (allErrors.Count == 0)
+            {
+                StatusTextBlock.Text =
+                    "Лексический и синтаксический анализ завершены. Общее количество найденных ошибок: 0.";
+            }
+            else
+            {
+                StatusTextBlock.Text =
+                    $"Лексический и синтаксический анализ завершены. Общее количество найденных ошибок: {allErrors.Count}.";
+            }
         }
 
         private void ShowCombinedResult(List<Lexeme> lexemes, List<Lexeme> lexicalErrors)
@@ -560,34 +604,40 @@ namespace GUI
                 });
             }
 
-            if (lexicalErrors.Count > 0)
-            {
-                foreach (var err in lexicalErrors)
-                {
-                    rows.Add(new CombinedAnalysisRow
-                    {
-                        Stage = "Парсер",
-                        Code = "",
-                        Type = "Лексическая ошибка",
-                        Text = err.Text,
-                        Location = $"строка {err.Line}, позиция {err.ColumnFrom}",
-                        Description = "Синтаксический анализ не выполнялся",
-                        StartIndex = err.StartIndex,
-                        Length = err.Length
-                    });
-                }
-
-                LexemesGrid.ItemsSource = rows;
-                StatusTextBlock.Text =
-                    $"Лексический анализ: ошибок {lexicalErrors.Count}. " +
-                    "Синтаксический анализ остановлен из-за лексических ошибок.";
-                return;
-            }
-
             var syntaxAnalyzer = new SyntaxAnalyzer();
             var syntaxResult = syntaxAnalyzer.Analyze(lexemes);
 
-            if (syntaxResult.Errors.Count == 0)
+            foreach (var err in lexicalErrors)
+            {
+                rows.Add(new CombinedAnalysisRow
+                {
+                    Stage = "Парсер",
+                    Code = "",
+                    Type = "Лексическая ошибка",
+                    Text = err.Text,
+                    Location = $"строка {err.Line}, позиция {err.ColumnFrom}",
+                    Description = err.Type,
+                    StartIndex = err.StartIndex,
+                    Length = err.Length
+                });
+            }
+
+            foreach (var err in syntaxResult.Errors)
+            {
+                rows.Add(new CombinedAnalysisRow
+                {
+                    Stage = "Парсер",
+                    Code = "",
+                    Type = "Синтаксическая ошибка",
+                    Text = err.InvalidFragment,
+                    Location = err.Location,
+                    Description = err.Description,
+                    StartIndex = err.StartIndex,
+                    Length = err.Length
+                });
+            }
+
+            if (lexicalErrors.Count == 0 && syntaxResult.Errors.Count == 0)
             {
                 rows.Add(new CombinedAnalysisRow
                 {
@@ -601,27 +651,12 @@ namespace GUI
                     Length = 0
                 });
             }
-            else
-            {
-                foreach (var err in syntaxResult.Errors)
-                {
-                    rows.Add(new CombinedAnalysisRow
-                    {
-                        Stage = "Парсер",
-                        Code = "",
-                        Type = "Синтаксическая ошибка",
-                        Text = err.InvalidFragment,
-                        Location = err.Location,
-                        Description = err.Description,
-                        StartIndex = err.StartIndex,
-                        Length = err.Length
-                    });
-                }
-            }
 
             LexemesGrid.ItemsSource = rows;
+
+            int totalErrors = lexicalErrors.Count + syntaxResult.Errors.Count;
             StatusTextBlock.Text =
-                $"Лексем: {lexemes.Count}. Синтаксических ошибок: {syntaxResult.Errors.Count}.";
+                $"Лексический и синтаксический анализ завершены. Общее количество найденных ошибок: {totalErrors}.";
         }
 
         private void ClearDiagnosticsGrid()
