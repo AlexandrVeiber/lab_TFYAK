@@ -28,8 +28,8 @@ namespace GUI.RegexSearch
 
             return taskType switch
             {
-                RegexTaskType.FileNames => SearchWholeLines(text, GetOriginalPattern(taskType)),
                 RegexTaskType.Numbers => SearchByPattern(text, GetSearchPatternForNumbers()),
+                RegexTaskType.FileNames => SearchByPattern(text, GetSearchPatternForFileNames()),
                 RegexTaskType.MacAddresses => SearchByPattern(text, GetSearchPatternForMac()),
                 _ => new List<RegexSearchResult>()
             };
@@ -37,10 +37,12 @@ namespace GUI.RegexSearch
 
         private static string GetSearchPatternForNumbers()
         {
-            // Ищем отдельные корректные числа внутри текста,
-            // но не допускаем выдёргивание частей из:
-            // A12, ver2.1, 12., .25, 7,25, --8, +9.0.1 и т.д.
             return @"(?<![\w\.,+\-])[+-]?\d+(?:\.\d+)?(?![\w\.,])";
+        }
+
+        private static string GetSearchPatternForFileNames()
+        {
+            return @"(?<![\w.@])[A-Za-zА-Яа-я0-9_-]+\.[A-Za-z0-9]+(?![\w.])";
         }
 
         private static string GetSearchPatternForMac()
@@ -74,44 +76,6 @@ namespace GUI.RegexSearch
                     Line = line,
                     Column = column
                 });
-            }
-
-            return results;
-        }
-
-        private static List<RegexSearchResult> SearchWholeLines(string text, string pattern)
-        {
-            var results = new List<RegexSearchResult>();
-
-            string[] lines = text.Split('\n');
-            int startIndex = 0;
-
-            for (int i = 0; i < lines.Length; i++)
-            {
-                string rawLine = lines[i];
-
-                string line = rawLine.EndsWith("\r")
-                    ? rawLine[..^1]
-                    : rawLine;
-
-                if (!string.IsNullOrEmpty(line) &&
-                    Regex.IsMatch(line, pattern, RegexOptions.CultureInvariant))
-                {
-                    results.Add(new RegexSearchResult
-                    {
-                        MatchedText = line,
-                        StartPosition = $"строка {i + 1}, символ 1",
-                        Length = line.Length,
-                        StartIndex = startIndex,
-                        Line = i + 1,
-                        Column = 1
-                    });
-                }
-
-                startIndex += rawLine.Length;
-
-                if (i < lines.Length - 1)
-                    startIndex += 1;
             }
 
             return results;
