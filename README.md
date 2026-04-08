@@ -33,7 +33,7 @@
 
 **Номер варианта:** 96. Цикл `do-while` на языке C++
 
-**Текстовое описание варианта:** требуется распознавать конструкцию цикла `do-while`, включающую ключевое слово `do`, тело цикла в виде блока операторов или одного оператора, ключевое слово `while` и условие повторения в круглых скобках с завершающей точкой с запятой.
+**Текстовое описание варианта:** требуется распознавать конструкцию цикла `do-while`, включающую ключевое слово `do`, тело цикла в виде блока с одним оператором или одного оператора, ключевое слово `while` и условие повторения в круглых скобках с завершающей точкой с запятой.
 
 **Примеры корректных входных строк:**
 
@@ -50,7 +50,6 @@ do counter--; while (counter > 0);
 ```cpp
 do {
     sum = sum + step;
-    index++;
 } while (index <= 10 && sum != limit);
 ```
 
@@ -76,57 +75,45 @@ do {
 ```text
 G[<DW>]:
 
-<DW> -> do <BODY>
+<DW> -> 'do' <BODY>
 
 <BODY> -> <BLOCK> <WHILE_PART> | <STMT> <WHILE_PART>
 
-<BLOCK> -> { <BLOCK_CONTENT>
+<BLOCK> -> '{' <STMT> '}'
 
-<BLOCK_CONTENT> -> <STMT_LIST> <BLOCK_END> | <BLOCK_END>
+<STMT> -> 'id' <STMT_TAIL>
 
-<BLOCK_END> -> }
+<STMT_TAIL> -> '++' ';' | '--' ';' | '=' <EXPR> ';'
 
-<STMT_LIST> -> <STMT> <STMT_LIST_TAIL>
+<WHILE_PART> -> 'while' <COND>
 
-<STMT_LIST_TAIL> -> <STMT> <STMT_LIST_TAIL> | ε
-
-<STMT> -> id <STMT_TAIL>
-
-<STMT_TAIL> -> ++ <STMT_END> | -- <STMT_END> | = <EXPR> <STMT_END>
-
-<STMT_END> -> ;
-
-<WHILE_PART> -> while <COND>
-
-<COND> -> ( <REL_EXPR> <COND_TAIL>
+<COND> -> '(' <REL_EXPR> <COND_TAIL>
 
 <COND_TAIL> -> <LOGICAL_OP> <REL_EXPR> <COND_TAIL> | <COND_END>
 
-<LOGICAL_OP> -> and | or | <LOGICAL_OP_SYMBOL>
+<LOGICAL_OP> -> 'and' | 'or' | '&&' | '||'
 
-<LOGICAL_OP_SYMBOL> -> && | ||
+<COND_END> -> ')' <DW_END>
+
+<DW_END> -> ';'
 
 <REL_EXPR> -> <EXPR> <REL_OP> <EXPR>
 
-<REL_OP> -> < | <= | > | >= | == | !=
-
-<COND_END> -> ) <DW_END>
-
-<DW_END> -> ;
+<REL_OP> -> '<' | '<=' | '>' | '>=' | '==' | '!='
 
 <EXPR> -> <TERM> <EXPR_TAIL>
 
-<EXPR_TAIL> -> + <TERM> <EXPR_TAIL> | - <TERM> <EXPR_TAIL> | ε
+<EXPR_TAIL> -> '+' <TERM> <EXPR_TAIL> | '-' <TERM> <EXPR_TAIL> | ε
 
 <TERM> -> <FACTOR> <TERM_TAIL>
 
-<TERM_TAIL> -> * <FACTOR> <TERM_TAIL> | / <FACTOR> <TERM_TAIL> | ε
+<TERM_TAIL> -> '*' <FACTOR> <TERM_TAIL> | '/' <FACTOR> <TERM_TAIL> | ε
 
-<FACTOR> -> id | num | ( <EXPR> )
+<FACTOR> -> 'id' | 'num' | '(' <EXPR> ')'
 
-<IDENTIFIER> -> letter <IDENTIFIER_REM> | _ <IDENTIFIER_REM>
+<IDENTIFIER> -> letter <IDENTIFIER_REM> | '_' <IDENTIFIER_REM>
 
-<IDENTIFIER_REM> -> letter <IDENTIFIER_REM> | digit <IDENTIFIER_REM> | _ <IDENTIFIER_REM> | ε
+<IDENTIFIER_REM> -> letter <IDENTIFIER_REM> | digit <IDENTIFIER_REM> | '_' <IDENTIFIER_REM> | ε
 
 <NUMBER> -> digit <NUMBER_TAIL>
 
@@ -143,49 +130,42 @@ digit -> '0' | '1' | ... | '9'
 ```text
 Z = <DW>
 
-VT = { do, while, and, or, id, num, +, -, *, /, =,
-       <, <=, >, >=, ==, !=, ++, --, &&, ||,
-       {, }, (, ), ; }
+VT = { 'do', 'while', 'and', 'or', 'id', 'num', '+', '-', '*', '/', '=',
+       '<', '<=', '>', '>=', '==', '!=', '++', '--', '&&', '||',
+       '{', '}', '(', ')', ';' }
 
-VN = { <DW>, <BODY>, <BLOCK>, <BLOCK_CONTENT>, <BLOCK_END>,
-       <STMT_LIST>, <STMT_LIST_TAIL>, <STMT>, <STMT_TAIL>, <STMT_END>,
-       <WHILE_PART>, <COND>, <COND_TAIL>, <LOGICAL_OP>, <LOGICAL_OP_SYMBOL>,
-       <REL_EXPR>, <REL_OP>, <COND_END>, <DW_END>,
-       <EXPR>, <EXPR_TAIL>, <TERM>, <TERM_TAIL>, <FACTOR>,
+VN = { <DW>, <BODY>, <BLOCK>, <STMT>, <STMT_TAIL>,
+       <WHILE_PART>, <COND>, <COND_TAIL>, <LOGICAL_OP>,
+       <COND_END>, <DW_END>,
+       <REL_EXPR>, <REL_OP>, <EXPR>, <EXPR_TAIL>,
+       <TERM>, <TERM_TAIL>, <FACTOR>,
        <IDENTIFIER>, <IDENTIFIER_REM>, <NUMBER>, <NUMBER_TAIL> }
 ```
 
 ### 5.3. Расшифровка нетерминалов
 
-- `<DW>` — конструкция цикла `do-while`;
-- `<BODY>` — тело цикла;
-- `<BLOCK>` — блок операторов;
-- `<BLOCK_CONTENT>` — содержимое блока;
-- `<BLOCK_END>` — завершение блока;
-- `<STMT_LIST>` — список операторов;
-- `<STMT_LIST_TAIL>` — продолжение списка операторов;
-- `<STMT>` — оператор;
-- `<STMT_TAIL>` — продолжение оператора;
-- `<STMT_END>` — конец оператора;
-- `<WHILE_PART>` — часть конструкции с `while`;
-- `<COND>` — условие цикла;
-- `<COND_TAIL>` — продолжение условия;
-- `<LOGICAL_OP>` — логическая операция;
-- `<LOGICAL_OP_SYMBOL>` — символьная логическая операция;
-- `<REL_EXPR>` — выражение отношения;
-- `<REL_OP>` — операция отношения;
-- `<COND_END>` — завершение условия;
-- `<DW_END>` — конец конструкции `do-while`;
-- `<EXPR>` — выражение;
-- `<EXPR_TAIL>` — продолжение выражения;
-- `<TERM>` — терм;
-- `<TERM_TAIL>` — продолжение терма;
-- `<FACTOR>` — множитель;
-- `<IDENTIFIER>` — идентификатор;
-- `<IDENTIFIER_REM>` — оставшаяся часть идентификатора;
-- `<NUMBER>` — число;
-- `<NUMBER_TAIL>` — оставшаяся часть числа.
-
+- <DW> — конструкция цикла do-while;
+- <BODY> — тело цикла;
+- <BLOCK> — блок с одним оператором;
+- <STMT> — оператор;
+- <STMT_TAIL> — продолжение оператора;
+- <WHILE_PART> — часть конструкции с while;
+- <COND> — условие цикла;
+- <COND_END> — завершение условия
+- <DW_END> — конец конструкции do-while
+- <COND_TAIL> — продолжение условия;
+- <LOGICAL_OP> — логическая операция;
+- <REL_EXPR> — выражение отношения;
+- <REL_OP> — операция отношения;
+- <EXPR> — выражение;
+- <EXPR_TAIL> — продолжение выражения;
+- <TERM> — терм;
+- <TERM_TAIL> — продолжение терма;
+- <FACTOR> — множитель;
+- <IDENTIFIER> — идентификатор;
+- <IDENTIFIER_REM> — оставшаяся часть идентификатора;
+- <NUMBER> — число;
+- <NUMBER_TAIL> — оставшаяся часть числа.
 
 ## 6. Классификация грамматики (по Хомскому)
 
@@ -193,14 +173,13 @@ VN = { <DW>, <BODY>, <BLOCK>, <BLOCK_CONTENT>, <BLOCK_END>,
 `A → α`, где `A ∈ VN`, `α ∈ V*`   
 при этом общий словарь грамматики определяется как `V = VT ∪ VN`.  
 
-Это означает, что в левой части каждого правила должен находиться ровно один нетерминальный символ, а в правой части — произвольная последовательность терминальных и нетерминальных символов. Именно такой вид имеют все продукции разработанной грамматики `G[<DW>]`: слева в каждом правиле стоит один нетерминал (`<DW>`, `<BODY>`, `<STMT_LIST>`, `<EXPR>` и др.), а справа — допустимая цепочка символов.
+Это означает, что в левой части каждого правила должен находиться ровно один нетерминальный символ, а в правой части — произвольная последовательность терминальных и нетерминальных символов. Именно такой вид имеют все продукции разработанной грамматики G[<DW>]: слева в каждом правиле стоит один нетерминал (<DW>, <BODY>, <STMT>, <EXPR> и др.), а справа — допустимая цепочка символов.
 
 Грамматика `G[<DW>]` не является автоматной, так как автоматные грамматики допускают только правила вида `A → aB`, `A → a` или `A → ε`. В разработанной грамматике имеются правила, которые не удовлетворяют этому ограничению, например:
 
 ```text
-<DW> -> do <BODY>
-<STMT_LIST> -> <STMT> <STMT_LIST_TAIL>
-<COND_TAIL> -> <LOGICAL_OP> <REL_EXPR> <COND_TAIL> | <COND_END>
+<BODY> -> <BLOCK> <WHILE_PART> | <STMT> <WHILE_PART>
+<EXPR> -> <TERM> <EXPR_TAIL>
 <TERM> -> <FACTOR> <TERM_TAIL>
 ```
 
@@ -218,12 +197,11 @@ VN = { <DW>, <BODY>, <BLOCK>, <BLOCK_CONTENT>, <BLOCK_END>,
 
 ## 7. Метод анализа
 
-Для разработанной грамматики `G[<DW>]` выбран метод рекурсивного спуска.
+Для разработанной грамматики G[<DW>] выбран метод рекурсивного спуска.
 
-Суть метода состоит в том, что каждому основному нетерминалу ставится в соответствие отдельная процедура анализа. В программе используются процедуры `DW()`, `BODY()`, `BLOCK()`, `BLOCK_CONTENT()`, `STMT_LIST()`, `STMT_LIST_TAIL()`, `STMT()`, `STMT_TAIL()`, `WHILE_PART()`, `COND()`, `COND_TAIL()`, `LOGICAL_OP()`, `REL_EXPR()`, `REL_OP()`, `EXPR()`, `EXPR_TAIL()`, `TERM()`, `TERM_TAIL()`, `FACTOR()`.
+Суть метода состоит в том, что каждому основному нетерминалу ставится в соответствие отдельная процедура анализа. В программе используются процедуры DW(), BODY(), BLOCK(), STMT(), STMT_TAIL(), WHILE_PART(), COND(), COND_TAIL(), LOGICAL_OP(), REL_EXPR(), REL_OP(), EXPR(), EXPR_TAIL(), TERM(), TERM_TAIL(), FACTOR().
 
-Анализатор получает на вход последовательность лексем после лексического анализа. Выбор дальнейшей ветви разбора определяется текущей лексемой. Например, после `do` процедура `BODY()` различает блок `{ ... }` и одиночный оператор, `STMT_TAIL()` различает варианты `++`, `--` и `=`, а `FACTOR()` распознаёт `id`, `num` или выражение в скобках.
-
+Анализатор получает на вход последовательность лексем после лексического анализа. Выбор дальнейшей ветви разбора определяется текущей лексемой. Например, после do процедура BODY() различает блок { ... } и одиночный оператор, STMT_TAIL() различает варианты ++, -- и =, а FACTOR() распознаёт id, num или выражение в скобках.
 Для корректной строки
 
 ```cpp
@@ -235,13 +213,13 @@ do {
 маршрут вызовов основных процедур имеет вид:
 
 ```text
-DW -> BODY -> BLOCK -> BLOCK_CONTENT -> STMT_LIST -> STMT -> STMT_TAIL ->
-STMT_LIST_TAIL -> WHILE_PART -> COND -> REL_EXPR -> EXPR -> TERM -> FACTOR ->
-REL_OP -> EXPR -> TERM -> FACTOR -> COND_TAIL
+DW -> BODY -> BLOCK -> STMT -> STMT_TAIL ->
+WHILE_PART -> COND -> REL_EXPR -> EXPR -> TERM -> FACTOR ->
+REL_OP -> EXPR -> TERM -> FACTOR -> COND_TAIL -> COND_END -> DW_END
 ```
 
 
-![Схема рекурсивного спуска](images/00_scheme.png)
+![Схема рекурсивного спуска](images/schemaRS.png)
 
 
 

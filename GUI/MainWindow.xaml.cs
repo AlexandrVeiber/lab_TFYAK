@@ -9,6 +9,8 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using GUI.Scanner;
 using GUI.Syntax;
+using GUI.RegexSearch;
+using GUI.AutomatonSearch;
 
 namespace GUI
 {
@@ -17,11 +19,16 @@ namespace GUI
         private string? _currentFilePath = null;
         private bool _isDirty = false;
 
+        private readonly RegexSearchService _regexSearchService = new();
+        private readonly MacAddressAutomatonSearcher _macAutomatonSearcher = new();
+
         private enum AnalysisMode
         {
             LexerOnly,
             ParserOnly,
-            Both
+            Both,
+            RegularExpressions,
+            MacAutomaton
         }
 
         private sealed class CombinedAnalysisRow
@@ -38,11 +45,23 @@ namespace GUI
         }
 
         private AnalysisMode CurrentAnalysisMode =>
-            AnalysisModeComboBox.SelectedIndex switch
+    AnalysisModeComboBox.SelectedIndex switch
+    {
+        0 => AnalysisMode.LexerOnly,
+        1 => AnalysisMode.ParserOnly,
+        2 => AnalysisMode.Both,
+        3 => AnalysisMode.RegularExpressions,
+        4 => AnalysisMode.MacAutomaton,
+        _ => AnalysisMode.Both
+    };
+
+        private RegexTaskType CurrentRegexTask =>
+            RegexTaskComboBox.SelectedIndex switch
             {
-                0 => AnalysisMode.LexerOnly,
-                1 => AnalysisMode.ParserOnly,
-                _ => AnalysisMode.Both
+                0 => RegexTaskType.Numbers,
+                1 => RegexTaskType.FileNames,
+                2 => RegexTaskType.MacAddresses,
+                _ => RegexTaskType.Numbers
             };
 
         public MainWindow()
@@ -51,6 +70,9 @@ namespace GUI
             UpdateTitle();
 
             AnalysisModeComboBox.SelectedIndex = 2;
+            RegexTaskComboBox.SelectedIndex = 0;
+
+            UpdateRegexControlsVisibility();
             ConfigureGridForCurrentMode();
 
             StatusTextBlock.Text = "Ожидание...";
@@ -68,6 +90,14 @@ namespace GUI
         {
             _isDirty = true;
             UpdateTitle();
+        }
+
+        private void UpdateRegexControlsVisibility()
+        {
+            bool isRegexMode = CurrentAnalysisMode == AnalysisMode.RegularExpressions;
+
+            RegexTaskLabel.Visibility = isRegexMode ? Visibility.Visible : Visibility.Collapsed;
+            RegexTaskComboBox.Visibility = isRegexMode ? Visibility.Visible : Visibility.Collapsed;
         }
 
         // ---------- Файл ----------
@@ -312,13 +342,17 @@ namespace GUI
                 return;
 
             ClearDiagnosticsGrid();
+            UpdateRegexControlsVisibility();
             ConfigureGridForCurrentMode();
 
             StatusTextBlock.Text = CurrentAnalysisMode switch
             {
                 AnalysisMode.LexerOnly => "Выбран режим: только лексический анализ.",
                 AnalysisMode.ParserOnly => "Выбран режим: только синтаксический анализ.",
-                _ => "Выбран режим: оба анализа."
+                AnalysisMode.Both => "Выбран режим: оба анализа.",
+                AnalysisMode.RegularExpressions => "Выбран режим: регулярные выражения.",
+                AnalysisMode.MacAutomaton => "Выбран режим: автоматный поиск MAC-адресов.",
+                _ => "Ожидание..."
             };
         }
 
@@ -336,6 +370,14 @@ namespace GUI
 
                 case AnalysisMode.Both:
                     ConfigureCombinedColumns();
+                    break;
+
+                case AnalysisMode.RegularExpressions:
+                    ConfigureRegexColumns();
+                    break;
+
+                case AnalysisMode.MacAutomaton:
+                    ConfigureRegexColumns();
                     break;
             }
         }
@@ -459,6 +501,35 @@ namespace GUI
             });
         }
 
+        private void ConfigureRegexColumns()
+        {
+            LexemesGrid.Columns.Clear();
+
+            LexemesGrid.Columns.Add(new DataGridTextColumn
+            {
+                Header = "Найденная подстрока",
+                Binding = new System.Windows.Data.Binding("MatchedText"),
+                Width = new DataGridLength(2, DataGridLengthUnitType.Star),
+                MinWidth = 220
+            });
+
+            LexemesGrid.Columns.Add(new DataGridTextColumn
+            {
+                Header = "Начальная позиция",
+                Binding = new System.Windows.Data.Binding("StartPosition"),
+                Width = DataGridLength.Auto,
+                MinWidth = 180
+            });
+
+            LexemesGrid.Columns.Add(new DataGridTextColumn
+            {
+                Header = "Длина",
+                Binding = new System.Windows.Data.Binding("Length"),
+                Width = DataGridLength.Auto,
+                MinWidth = 90
+            });
+        }
+
         // ---------- Пуск ----------
         private void Run_Click(object sender, RoutedEventArgs e)
         {
@@ -466,6 +537,18 @@ namespace GUI
 
             ClearDiagnosticsGrid();
             ConfigureGridForCurrentMode();
+
+            if (CurrentAnalysisMode == AnalysisMode.RegularExpressions)
+            {
+                ShowRegexResult(text);
+                return;
+            }
+
+            if (CurrentAnalysisMode == AnalysisMode.MacAutomaton)
+            {
+                ShowMacAutomatonResult(text);
+                return;
+            }
 
             var scanner = new LexicalAnalyzer();
             var lexemes = scanner.Analyze(text);
@@ -488,6 +571,31 @@ namespace GUI
                 case AnalysisMode.Both:
                     ShowCombinedResult(lexemes, lexicalErrors);
                     break;
+            }
+        }
+
+        private void ShowMacAutomatonResult(string text)
+        {
+            ConfigureRegexColumns();
+
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                LexemesGrid.ItemsSource = null;
+                StatusTextBlock.Text = "Нет данных для поиска.";
+                return;
+            }
+
+            var results = _macAutomatonSearcher.Search(text);
+
+            LexemesGrid.ItemsSource = results;
+
+            if (results.Count == 0)
+            {
+                StatusTextBlock.Text = "Автоматный поиск завершён. Тип: MAC-адреса. Совпадений не найдено.";
+            }
+            else
+            {
+                StatusTextBlock.Text = $"Автоматный поиск завершён. Тип: MAC-адреса. Найдено совпадений: {results.Count}.";
             }
         }
 
@@ -659,6 +767,34 @@ namespace GUI
                 $"Лексический и синтаксический анализ завершены. Общее количество найденных ошибок: {totalErrors}.";
         }
 
+        private void ShowRegexResult(string text)
+        {
+            ConfigureRegexColumns();
+
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                LexemesGrid.ItemsSource = null;
+                StatusTextBlock.Text = "Нет данных для поиска.";
+                return;
+            }
+
+            var taskType = CurrentRegexTask;
+            var results = _regexSearchService.Search(text, taskType);
+
+            LexemesGrid.ItemsSource = results;
+
+            string taskTitle = _regexSearchService.GetTaskTitle(taskType);
+
+            if (results.Count == 0)
+            {
+                StatusTextBlock.Text = $"Поиск завершён. Тип: {taskTitle}. Совпадений не найдено.";
+            }
+            else
+            {
+                StatusTextBlock.Text = $"Поиск завершён. Тип: {taskTitle}. Найдено совпадений: {results.Count}.";
+            }
+        }
+
         private void ClearDiagnosticsGrid()
         {
             LexemesGrid.ItemsSource = null;
@@ -710,6 +846,11 @@ namespace GUI
                 case CombinedAnalysisRow row when row.StartIndex >= 0:
                     HighlightFragment(row.StartIndex, row.Length);
                     StatusTextBlock.Text = $"Переход к фрагменту: {row.Location}";
+                    break;
+
+                case RegexSearchResult regexResult:
+                    HighlightFragment(regexResult.StartIndex, regexResult.Length);
+                    StatusTextBlock.Text = $"Переход к найденному фрагменту: {regexResult.StartPosition}";
                     break;
             }
         }

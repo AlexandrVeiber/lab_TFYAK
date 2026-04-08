@@ -345,6 +345,7 @@ namespace GUI.Syntax
         {
             if (CheckText("}"))
             {
+                AddError(Current, "Ожидался оператор внутри блока");
                 Next();
                 return;
             }
@@ -355,33 +356,8 @@ namespace GUI.Syntax
                 return;
             }
 
-            STMT_LIST();
-            MatchOrInsert("}", "Ожидался символ }");
-        }
-
-        private void STMT_LIST()
-        {
             STMT();
-            STMT_LIST_TAIL();
-        }
-
-        private void STMT_LIST_TAIL()
-        {
-            while (CheckStatementStart())
-            {
-                STMT();
-            }
-
-            if (Current != null && !CheckText("}") && !CheckText("while"))
-            {
-                AddError(Current, "Ожидался следующий оператор или символ }");
-                RecoveryTo("<stmt>", "}", "while");
-
-                while (CheckStatementStart())
-                {
-                    STMT();
-                }
-            }
+            MatchOrInsert("}", "Ожидался символ }");
         }
 
         private void STMT()

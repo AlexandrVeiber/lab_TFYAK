@@ -36,9 +36,7 @@ namespace GUI.Scanner
 
         private const int CODE_AND = 24;
         private const int CODE_OR = 25;
-        private const int CODE_BIT_OR = 26;
         private const int CODE_LOGICAL_OR = 27;
-        private const int CODE_BIT_AND = 28;
         private const int CODE_LOGICAL_AND = 29;
 
         private const int CODE_ERROR = 99;
@@ -148,15 +146,12 @@ namespace GUI.Scanner
 
                     string prefix = text.Substring(start, i - start);
 
-                    // Обычное завершение слова на границе лексемы
                     if (i >= text.Length || IsWordBoundary(text[i]))
                     {
                         result.Add(MakeWordLexeme(prefix, line, startCol, start));
                         continue;
                     }
 
-                    // 1. Случай неполного префикса:
-                    //    whi$#le, d$o, a#nd, o%r
                     if (TryReadBrokenKeyword(
                         text,
                         start,
@@ -173,8 +168,6 @@ namespace GUI.Scanner
                         continue;
                     }
 
-                    // 2. Случай полного ключевого слова с испорченным хвостом:
-                    //    while$, do#, and%, or@
                     if (TryReadBrokenKeywordTail(
                         text,
                         start,
@@ -191,7 +184,6 @@ namespace GUI.Scanner
                         continue;
                     }
 
-                    // 3. Нормальное ключевое слово
                     if (TryGetKeywordInfo(prefix, out int keywordCode, out string keywordType))
                     {
                         result.Add(MakeLexeme(
@@ -207,7 +199,6 @@ namespace GUI.Scanner
                         continue;
                     }
 
-                    // 4. Обычный идентификатор
                     result.Add(MakeLexeme(
                         CODE_IDENTIFIER,
                         "идентификатор",
@@ -485,14 +476,15 @@ namespace GUI.Scanner
                                 i++;
                                 col++;
                                 result.Add(MakeLexeme(
-                                    CODE_BIT_AND,
-                                    "побитовое И",
+                                    CODE_ERROR,
+                                    "ошибка: недопустимый символ",
                                     "&",
                                     line,
                                     tokenStartCol,
                                     col - 1,
                                     tokenStart,
-                                    1));
+                                    1,
+                                    true));
                             }
                             else if (count == 2)
                             {
@@ -542,14 +534,15 @@ namespace GUI.Scanner
                                 i++;
                                 col++;
                                 result.Add(MakeLexeme(
-                                    CODE_BIT_OR,
-                                    "побитовое ИЛИ",
+                                    CODE_ERROR,
+                                    "ошибка: недопустимый символ",
                                     "|",
                                     line,
                                     tokenStartCol,
                                     col - 1,
                                     tokenStart,
-                                    1));
+                                    1,
+                                    true));
                             }
                             else if (count == 2)
                             {
@@ -785,8 +778,6 @@ namespace GUI.Scanner
             newIndex = startIndex;
             newCol = startCol;
 
-            // Склеиваем только случай, когда уже есть правильное начало ключевого слова,
-            // но само ключевое слово ещё не закончено: w, wh, whi, d, a, an, o
             if (!IsProperKeywordPrefix(prefix))
                 return false;
 
@@ -844,7 +835,6 @@ namespace GUI.Scanner
             int j = startIndex + keyword.Length;
             int currentCol = startCol + keyword.Length;
 
-            // while$, do#, and%, or@
             if (j >= text.Length || !IsInvalidFragmentChar(text[j]))
                 return false;
 

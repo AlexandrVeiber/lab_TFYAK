@@ -159,11 +159,27 @@
                                Margin="0,0,8,0"/>
 
                     <ComboBox x:Name="AnalysisModeComboBox"
-                              Width="220"
-                              SelectionChanged="AnalysisModeComboBox_SelectionChanged">
+                                Width="220"
+                                SelectionChanged="AnalysisModeComboBox_SelectionChanged">
                         <ComboBoxItem Content="Только лексический"/>
                         <ComboBoxItem Content="Только синтаксический"/>
                         <ComboBoxItem Content="Оба сразу"/>
+                        <ComboBoxItem Content="Регулярные выражения"/>
+                        <ComboBoxItem Content="Автомат (MAC-адреса)"/>
+                    </ComboBox>
+
+                    <TextBlock x:Name="RegexTaskLabel"
+                               Text="Тип поиска:"
+                               VerticalAlignment="Center"
+                               Margin="16,0,8,0"
+                               Visibility="Collapsed"/>
+
+                    <ComboBox x:Name="RegexTaskComboBox"
+                              Width="300"
+                              Visibility="Collapsed">
+                        <ComboBoxItem Content="Целые и вещественные числа"/>
+                        <ComboBoxItem Content="Корректные названия файлов"/>
+                        <ComboBoxItem Content="MAC-адреса"/>
                     </ComboBox>
                 </StackPanel>
 
