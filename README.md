@@ -211,7 +211,7 @@ do {
 
 **диаграмма:**
 
-![Диаграмма состояний](Screenshots/state_diagram1.png)
+![Диаграмма состояний](Screenshots/state_diagram.png)
 
 ---
 
