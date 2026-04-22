@@ -198,7 +198,7 @@ do {
 **Пример вставки в README:**
 
 ```md
-![CST для корректной строки do-while](C:\Users\Александр\source\repos\lab_TFYAK\images\lab5\cst_correct_do_while.png)
+![CST для корректной строки do-while](images/lab5/01_cst_correct_do_while.png)
 ```
 
 ### 6.3. AST для корректной строки
