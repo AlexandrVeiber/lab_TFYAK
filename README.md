@@ -171,12 +171,12 @@ do {
 
 **Путь к изображению:**
 
-`C:\Users\Александр\source\repos\lab_TFYAK\images\lab5\00_general_cst_do_while.png`
+`images/lab5/00_general_cst_do_while.png`
 
 **Пример вставки в README:**
 
 ```md
-![Общая схема CST для конструкции do-while](C:\Users\Александр\source\repos\lab_TFYAK\images\lab5\00_general_cst_do_while.png)
+![Общая схема CST для конструкции do-while](images/lab5/00_general_cst_do_while.png)
 ```
 
 ### 6.2. CST для корректной строки
@@ -193,7 +193,7 @@ do {
 
 **Путь к изображению:**
 
-`C:\Users\Александр\source\repos\lab_TFYAK\images\lab5\01_cst_correct_do_while.png`
+`images/lab5/01_cst_correct_do_while.png`
 
 **Пример вставки в README:**
 
@@ -207,12 +207,12 @@ AST отображает уже не полную грамматическую �
 
 **Путь к изображению:**
 
-`C:\Users\Александр\source\repos\lab_TFYAK\images\lab5\ast_correct_do_while.png`
+`images/lab5/ast_correct_do_while.png`
 
 **Пример вставки в README:**
 
 ```md
-![AST для корректной строки do-while](C:\Users\Александр\source\repos\lab_TFYAK\images\lab5\02_ast_correct_do_while.png)
+![AST для корректной строки do-while](images/lab5/ast_correct_do_while.png)
 ```
 
 ---
