@@ -11,6 +11,7 @@ using GUI.Scanner;
 using GUI.Syntax;
 using GUI.RegexSearch;
 using GUI.AutomatonSearch;
+using GUI.Semantic;
 
 namespace GUI
 {
@@ -27,6 +28,7 @@ namespace GUI
             LexerOnly,
             ParserOnly,
             Both,
+            SemanticAst,
             RegularExpressions,
             MacAutomaton
         }
@@ -45,15 +47,16 @@ namespace GUI
         }
 
         private AnalysisMode CurrentAnalysisMode =>
-    AnalysisModeComboBox.SelectedIndex switch
-    {
-        0 => AnalysisMode.LexerOnly,
-        1 => AnalysisMode.ParserOnly,
-        2 => AnalysisMode.Both,
-        3 => AnalysisMode.RegularExpressions,
-        4 => AnalysisMode.MacAutomaton,
-        _ => AnalysisMode.Both
-    };
+            AnalysisModeComboBox.SelectedIndex switch
+            {
+                0 => AnalysisMode.LexerOnly,
+                1 => AnalysisMode.ParserOnly,
+                2 => AnalysisMode.Both,
+                3 => AnalysisMode.SemanticAst,
+                4 => AnalysisMode.RegularExpressions,
+                5 => AnalysisMode.MacAutomaton,
+                _ => AnalysisMode.SemanticAst
+            };
 
         private RegexTaskType CurrentRegexTask =>
             RegexTaskComboBox.SelectedIndex switch
@@ -69,7 +72,7 @@ namespace GUI
             InitializeComponent();
             UpdateTitle();
 
-            AnalysisModeComboBox.SelectedIndex = 2;
+            AnalysisModeComboBox.SelectedIndex = 3;
             RegexTaskComboBox.SelectedIndex = 0;
 
             UpdateRegexControlsVisibility();
@@ -78,6 +81,7 @@ namespace GUI
             StatusTextBlock.Text = "Ожидание...";
             LexemesGrid.ItemsSource = null;
             LexemesGrid.Items.Clear();
+            ResultTabControl.SelectedIndex = 0;
         }
 
         private void UpdateTitle()
@@ -98,6 +102,16 @@ namespace GUI
 
             RegexTaskLabel.Visibility = isRegexMode ? Visibility.Visible : Visibility.Collapsed;
             RegexTaskComboBox.Visibility = isRegexMode ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        private void UpdateAstPlaceholder()
+        {
+            if (!IsLoaded && AstTextBox == null)
+                return;
+
+            AstTextBox.Text = CurrentAnalysisMode == AnalysisMode.SemanticAst
+                ? "AST появится здесь после запуска семантического анализа."
+                : "AST выводится только в режиме «Семантический + AST».";
         }
 
         // ---------- Файл ----------
@@ -350,6 +364,7 @@ namespace GUI
                 AnalysisMode.LexerOnly => "Выбран режим: только лексический анализ.",
                 AnalysisMode.ParserOnly => "Выбран режим: только синтаксический анализ.",
                 AnalysisMode.Both => "Выбран режим: оба анализа.",
+                AnalysisMode.SemanticAst => "Выбран режим: семантический анализ и построение AST.",
                 AnalysisMode.RegularExpressions => "Выбран режим: регулярные выражения.",
                 AnalysisMode.MacAutomaton => "Выбран режим: автоматный поиск MAC-адресов.",
                 _ => "Ожидание..."
@@ -372,6 +387,10 @@ namespace GUI
                     ConfigureCombinedColumns();
                     break;
 
+                case AnalysisMode.SemanticAst:
+                    ConfigureSemanticColumns();
+                    break;
+
                 case AnalysisMode.RegularExpressions:
                     ConfigureRegexColumns();
                     break;
@@ -380,6 +399,8 @@ namespace GUI
                     ConfigureRegexColumns();
                     break;
             }
+
+            UpdateAstPlaceholder();
         }
 
         private void ConfigureLexerColumns()
@@ -420,6 +441,35 @@ namespace GUI
         }
 
         private void ConfigureParserColumns()
+        {
+            LexemesGrid.Columns.Clear();
+
+            LexemesGrid.Columns.Add(new DataGridTextColumn
+            {
+                Header = "Неверный фрагмент",
+                Binding = new System.Windows.Data.Binding("InvalidFragment"),
+                Width = new DataGridLength(1, DataGridLengthUnitType.Star),
+                MinWidth = 150
+            });
+
+            LexemesGrid.Columns.Add(new DataGridTextColumn
+            {
+                Header = "Местоположение",
+                Binding = new System.Windows.Data.Binding("Location"),
+                Width = DataGridLength.Auto,
+                MinWidth = 180
+            });
+
+            LexemesGrid.Columns.Add(new DataGridTextColumn
+            {
+                Header = "Описание",
+                Binding = new System.Windows.Data.Binding("Description"),
+                Width = new DataGridLength(2, DataGridLengthUnitType.Star),
+                MinWidth = 260
+            });
+        }
+
+        private void ConfigureSemanticColumns()
         {
             LexemesGrid.Columns.Clear();
 
@@ -550,6 +600,16 @@ namespace GUI
                 return;
             }
 
+            if (string.IsNullOrWhiteSpace(text) &&
+                (CurrentAnalysisMode == AnalysisMode.ParserOnly ||
+                 CurrentAnalysisMode == AnalysisMode.Both ||
+                 CurrentAnalysisMode == AnalysisMode.SemanticAst))
+            {
+                LexemesGrid.ItemsSource = null;
+                StatusTextBlock.Text = "Ожидается строка для анализа.";
+                return;
+            }
+
             var scanner = new LexicalAnalyzer();
             var lexemes = scanner.Analyze(text);
             lexemes = MergeAdjacentLexicalErrors(lexemes);
@@ -571,7 +631,56 @@ namespace GUI
                 case AnalysisMode.Both:
                     ShowCombinedResult(lexemes, lexicalErrors);
                     break;
+
+                case AnalysisMode.SemanticAst:
+                    ShowSemanticResult(lexemes, lexicalErrors);
+                    break;
             }
+        }
+
+        private void ShowSemanticResult(List<Lexeme> lexemes, List<Lexeme> lexicalErrors)
+        {
+            ConfigureSemanticColumns();
+
+            if (lexicalErrors.Count > 0)
+            {
+                var lexicalRows = lexicalErrors
+                    .Select(ConvertLexicalErrorToSyntaxError)
+                    .ToList();
+
+                LexemesGrid.ItemsSource = lexicalRows;
+                AstTextBox.Text = "AST не построено, так как обнаружены лексические ошибки.";
+                ResultTabControl.SelectedIndex = 0;
+
+                StatusTextBlock.Text =
+                    $"Семантический анализ не выполнен. Сначала исправьте лексические ошибки. Общее количество найденных ошибок: {lexicalRows.Count}.";
+
+                return;
+            }
+
+            var syntaxAnalyzer = new SyntaxAnalyzer();
+            var syntaxResult = syntaxAnalyzer.Analyze(lexemes);
+
+            if (!syntaxResult.Success)
+            {
+                LexemesGrid.ItemsSource = syntaxResult.Errors;
+                AstTextBox.Text = "AST не построено, так как обнаружены синтаксические ошибки.";
+                ResultTabControl.SelectedIndex = 0;
+
+                StatusTextBlock.Text =
+                    $"Семантический анализ не выполнен. Сначала исправьте синтаксические ошибки. Общее количество найденных ошибок: {syntaxResult.Errors.Count}.";
+
+                return;
+            }
+
+            var semanticAnalyzer = new SemanticAnalyzer();
+            var semanticResult = semanticAnalyzer.Analyze(lexemes);
+
+            LexemesGrid.ItemsSource = semanticResult.Errors;
+            AstTextBox.Text = semanticResult.AstText;
+
+            ResultTabControl.SelectedIndex = semanticResult.Errors.Count == 0 ? 1 : 0;
+            StatusTextBlock.Text = semanticResult.Message;
         }
 
         private void ShowMacAutomatonResult(string text)
@@ -682,12 +791,12 @@ namespace GUI
             if (allErrors.Count == 0)
             {
                 StatusTextBlock.Text =
-                    "Лексический и синтаксический анализ завершены. Общее количество найденных ошибок: 0.";
+                    "Синтаксический анализ завершён. Общее количество найденных ошибок: 0.";
             }
             else
             {
                 StatusTextBlock.Text =
-                    $"Лексический и синтаксический анализ завершены. Общее количество найденных ошибок: {allErrors.Count}.";
+                    $"Синтаксический анализ завершён. Общее количество найденных ошибок: {allErrors.Count}.";
             }
         }
 
@@ -799,6 +908,8 @@ namespace GUI
         {
             LexemesGrid.ItemsSource = null;
             LexemesGrid.Items.Clear();
+            AstTextBox.Clear();
+            ResultTabControl.SelectedIndex = 0;
         }
 
         private SyntaxErrorInfo ConvertLexicalErrorToSyntaxError(Lexeme lexeme)
@@ -841,6 +952,11 @@ namespace GUI
                 case SyntaxErrorInfo error:
                     HighlightFragment(error.StartIndex, error.Length);
                     StatusTextBlock.Text = $"Переход к ошибке: {error.Location}";
+                    break;
+
+                case SemanticErrorInfo semanticError:
+                    HighlightFragment(semanticError.StartIndex, semanticError.Length);
+                    StatusTextBlock.Text = $"Переход к ошибке: {semanticError.Location}";
                     break;
 
                 case CombinedAnalysisRow row when row.StartIndex >= 0:

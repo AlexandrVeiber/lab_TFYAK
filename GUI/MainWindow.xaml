@@ -159,11 +159,12 @@
                                Margin="0,0,8,0"/>
 
                     <ComboBox x:Name="AnalysisModeComboBox"
-                                Width="220"
-                                SelectionChanged="AnalysisModeComboBox_SelectionChanged">
+                              Width="250"
+                              SelectionChanged="AnalysisModeComboBox_SelectionChanged">
                         <ComboBoxItem Content="Только лексический"/>
                         <ComboBoxItem Content="Только синтаксический"/>
                         <ComboBoxItem Content="Оба сразу"/>
+                        <ComboBoxItem Content="Семантический + AST"/>
                         <ComboBoxItem Content="Регулярные выражения"/>
                         <ComboBoxItem Content="Автомат (MAC-адреса)"/>
                     </ComboBox>
@@ -195,21 +196,37 @@
                                Text=""/>
                 </Border>
 
-                <DataGrid x:Name="LexemesGrid"
-                          AutoGenerateColumns="False"
-                          IsReadOnly="True"
-                          SelectionMode="Single"
-                          CanUserAddRows="False"
-                          CanUserDeleteRows="False"
-                          CanUserResizeRows="False"
-                          GridLinesVisibility="Horizontal"
-                          HeadersVisibility="Column"
-                          RowHeaderWidth="0"
-                          AlternatingRowBackground="#FAFAFA"
-                          BorderBrush="#DDDDDD"
-                          BorderThickness="1"
-                          MouseLeftButtonUp="LexemesGrid_MouseLeftButtonUp"
-                          SelectionChanged="LexemesGrid_SelectionChanged"/>
+                <TabControl x:Name="ResultTabControl">
+                    <TabItem Header="Диагностика">
+                        <DataGrid x:Name="LexemesGrid"
+                                  AutoGenerateColumns="False"
+                                  IsReadOnly="True"
+                                  SelectionMode="Single"
+                                  CanUserAddRows="False"
+                                  CanUserDeleteRows="False"
+                                  CanUserResizeRows="False"
+                                  GridLinesVisibility="Horizontal"
+                                  HeadersVisibility="Column"
+                                  RowHeaderWidth="0"
+                                  AlternatingRowBackground="#FAFAFA"
+                                  BorderBrush="#DDDDDD"
+                                  BorderThickness="1"
+                                  MouseLeftButtonUp="LexemesGrid_MouseLeftButtonUp"
+                                  SelectionChanged="LexemesGrid_SelectionChanged"/>
+                    </TabItem>
+
+                    <TabItem Header="AST">
+                        <TextBox x:Name="AstTextBox"
+                                 IsReadOnly="True"
+                                 AcceptsReturn="True"
+                                 VerticalScrollBarVisibility="Auto"
+                                 HorizontalScrollBarVisibility="Auto"
+                                 FontFamily="Consolas"
+                                 FontSize="14"
+                                 TextWrapping="NoWrap"
+                                 Margin="4"/>
+                    </TabItem>
+                </TabControl>
             </DockPanel>
         </Grid>
     </DockPanel>
