@@ -5,7 +5,7 @@
 **Название работы:** «Построение AST и проверка контекстно-зависимых условий для конструкции цикла `do-while` языка C++».
 
 **Студент:** Вейбер А. С.  
-**Группа:** АП - 327 
+**Группа:** АП - 327  
 **Дисциплина:** «Теория формальных языков и компиляторов»  
 **Лабораторная работа:** №5  
 **Вариант:** цикл `do-while` на языке C++
@@ -173,11 +173,7 @@ do {
 
 `images/lab5/00_general_cst_do_while.png`
 
-**Пример вставки в README:**
-
-```md
 ![Общая схема CST для конструкции do-while](images/lab5/00_general_cst_do_while.png)
-```
 
 ### 6.2. CST для корректной строки
 
@@ -193,13 +189,9 @@ do {
 
 **Путь к изображению:**
 
-`images/lab5/01_cst_correct_do_while.png`
+`images/lab5/cst_correct_do_while.png`
 
-**Пример вставки в README:**
-
-
-![CST для корректной строки do-while](images/lab5/01_cst_correct_do_while.png)
-
+![CST для корректной строки do-while](images/lab5/cst_correct_do_while.png)
 
 ### 6.3. AST для корректной строки
 
@@ -209,11 +201,7 @@ AST отображает уже не полную грамматическую �
 
 `images/lab5/ast_correct_do_while.png`
 
-**Пример вставки в README:**
-
-```md
 ![AST для корректной строки do-while](images/lab5/ast_correct_do_while.png)
-```
 
 ---
 
@@ -261,7 +249,7 @@ do {
 
 **Скриншот:**
 
-`C:\Users\Александр\source\repos\lab_TFYAK\images\lab5\01_correct_block.png`
+![Корректная строка с блоком](images/lab5/01_correct_block.png)
 
 ### 8.2. Корректная строка без блока
 
@@ -271,7 +259,7 @@ do counter--; while (counter > 0);
 
 **Скриншот:**
 
-`C:\Users\Александр\source\repos\lab_TFYAK\images\lab5\02_correct_single_statement.png`
+![Корректная строка без блока](images/lab5/02_correct_single_statement.png)
 
 ### 8.3. Пустой блок
 
@@ -282,7 +270,7 @@ do {
 
 **Скриншот:**
 
-`C:\Users\Александр\source\repos\lab_TFYAK\images\lab5\03_empty_block.png`
+![Пустой блок](images/lab5/03_empty_block.png)
 
 ### 8.4. Необъявленный идентификатор
 
@@ -296,7 +284,7 @@ do {
 
 **Скриншот:**
 
-`C:\Users\Александр\source\repos\lab_TFYAK\images\lab5\04_undeclared_identifier.png`
+![Необъявленный идентификатор](images/lab5/04_undeclared_identifier.png)
 
 ### 8.5. Число вне диапазона Int32
 
@@ -310,7 +298,7 @@ do {
 
 **Скриншот:**
 
-`C:\Users\Александр\source\repos\lab_TFYAK\images\lab5\05_out_of_range_literal.png`
+![Число вне диапазона Int32](images/lab5/05_out_of_range_literal.png)
 
 ### 8.6. Отсутствует ключевое слово do
 
@@ -324,7 +312,7 @@ do {
 
 **Скриншот:**
 
-`C:\Users\Александр\source\repos\lab_TFYAK\images\lab5\06_missing_do.png`
+![Отсутствует ключевое слово do](images/lab5/06_missing_do.png)
 
 ### 8.7. Лишние символы `;` после do
 
@@ -338,8 +326,7 @@ do ;;; {
 
 **Скриншот:**
 
-`C:\Users\Александр\source\repos\lab_TFYAK\images\lab5\07_extra_semicolons_after_do.png`
-
+![Лишние символы после do](images/lab5/07_extra_semicolons_after_do.png)
 
 ### 8.8. Искажённое ключевое слово do
 
@@ -353,7 +340,7 @@ do ;;; {
 
 **Скриншот:**
 
-`images\lab5\08_broken_do_keyword.png`
+![Искажённое ключевое слово do](images/lab5/08_broken_do_keyword.png)
 
 ---
 
