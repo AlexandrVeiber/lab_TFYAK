@@ -340,23 +340,8 @@ do ;;; {
 
 `C:\Users\Александр\source\repos\lab_TFYAK\images\lab5\07_extra_semicolons_after_do.png`
 
-### 8.8. Лишние символы `;` внутри блока
 
-```cpp
-do {
-    ;;;
-    number++;
-    ;;;
-} while (number < 5);
-```
-
-**Ожидаемый результат:** синтаксические ошибки о лишних символах `;` внутри блока.
-
-**Скриншот:**
-
-`C:\Users\Александр\source\repos\lab_TFYAK\images\lab5\08_extra_semicolons_inside_block.png`
-
-### 8.9. Искажённое ключевое слово do
+### 8.8. Искажённое ключевое слово do
 
 ```cpp
 ; ; do$ {
@@ -368,7 +353,7 @@ do {
 
 **Скриншот:**
 
-`C:\Users\Александр\source\repos\lab_TFYAK\images\lab5\09_broken_do_keyword.png`
+`images\lab5\08_broken_do_keyword.png`
 
 ---
 
