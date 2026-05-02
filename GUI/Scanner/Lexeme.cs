@@ -13,6 +13,6 @@
         public bool IsError { get; set; }
         public int Line { get; set; }
         public int ColumnFrom { get; set; }
-        public int ColumnTo { get; set; }
+        public int ColumnTo { get; set; }   
     }
 }

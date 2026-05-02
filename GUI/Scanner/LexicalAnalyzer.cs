@@ -722,6 +722,23 @@ namespace GUI.Scanner
                     word.Length);
             }
 
+            // Если слово очень похоже на ключевое слово,
+            // считаем его искажённым ключевым словом, а не идентификатором.
+            // Например: dod -> ошибка do, whele -> ошибка while.
+            if (TryDetectBrokenKeyword(word, out string expectedKeyword))
+            {
+                return MakeLexeme(
+                    CODE_ERROR,
+                    $"ошибка: искажено ключевое слово {expectedKeyword}",
+                    word,
+                    line,
+                    startCol,
+                    startCol + word.Length - 1,
+                    startIndex,
+                    word.Length,
+                    true);
+            }
+
             return MakeLexeme(
                 CODE_IDENTIFIER,
                 "идентификатор",
@@ -765,21 +782,18 @@ namespace GUI.Scanner
         }
 
         private static bool TryReadBrokenKeyword(
-            string text,
-            int startIndex,
-            string prefix,
-            int line,
-            int startCol,
-            out Lexeme lexeme,
-            out int newIndex,
-            out int newCol)
+    string text,
+    int startIndex,
+    string prefix,
+    int line,
+    int startCol,
+    out Lexeme lexeme,
+    out int newIndex,
+    out int newCol)
         {
             lexeme = null!;
             newIndex = startIndex;
             newCol = startCol;
-
-            if (!IsProperKeywordPrefix(prefix))
-                return false;
 
             int j = startIndex + prefix.Length;
             int currentCol = startCol + prefix.Length;
@@ -791,28 +805,138 @@ namespace GUI.Scanner
             }
 
             string fragment = text.Substring(startIndex, j - startIndex);
+
+            // Проверяем фрагмент целиком.
+            // Например:
+            // wh@le -> ошибка while
+            // d@ -> ошибка do
+            // an@ -> ошибка and
+            if (TryDetectBrokenKeyword(fragment, out string expectedKeyword))
+            {
+                lexeme = MakeLexeme(
+                    CODE_ERROR,
+                    $"ошибка: искажено ключевое слово {expectedKeyword}",
+                    fragment,
+                    line,
+                    startCol,
+                    currentCol - 1,
+                    startIndex,
+                    fragment.Length,
+                    true);
+
+                newIndex = j;
+                newCol = currentCol;
+                return true;
+            }
+
+            // Дополнительная проверка по очищенному фрагменту:
+            // wh@le -> whle -> похоже на while
             string cleaned = ExtractIdentifierChars(fragment);
 
-            if (!TryGetKeywordInfo(cleaned, out _, out _))
+            if (cleaned != fragment &&
+                TryDetectBrokenKeyword(cleaned, out expectedKeyword))
+            {
+                lexeme = MakeLexeme(
+                    CODE_ERROR,
+                    $"ошибка: искажено ключевое слово {expectedKeyword}",
+                    fragment,
+                    line,
+                    startCol,
+                    currentCol - 1,
+                    startIndex,
+                    fragment.Length,
+                    true);
+
+                newIndex = j;
+                newCol = currentCol;
+                return true;
+            }
+
+            return false;
+        }
+
+        private static bool TryDetectBrokenKeyword(string fragment, out string expectedKeyword)
+        {
+            expectedKeyword = "";
+
+            string cleaned = ExtractIdentifierChars(fragment);
+
+            // Проверяем основные ключевые слова грамматики.
+            string[] keywords = { "do", "while", "and", "or" };
+
+            foreach (string keyword in keywords)
+            {
+                if (fragment == keyword || cleaned == keyword)
+                    continue;
+
+                // Если фрагмент начинается как ключевое слово или очень похож на него,
+                // считаем его искажённым ключевым словом.
+                bool hasKeywordPrefix =
+                    keyword.StartsWith(cleaned) ||
+                    cleaned.StartsWith(keyword) ||
+                    HasCommonPrefix(cleaned, keyword, 1);
+
+                int distanceByFragment = LevenshteinDistance(fragment, keyword);
+                int distanceByCleaned = LevenshteinDistance(cleaned, keyword);
+
+                bool isClose =
+                    distanceByFragment <= 2 ||
+                    distanceByCleaned <= 2;
+
+                if (hasKeywordPrefix && isClose)
+                {
+                    expectedKeyword = keyword;
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool HasCommonPrefix(string a, string b, int minLength)
+        {
+            if (string.IsNullOrEmpty(a) || string.IsNullOrEmpty(b))
                 return false;
 
-            if (cleaned.Length <= prefix.Length)
-                return false;
+            int count = 0;
+            int len = Math.Min(a.Length, b.Length);
 
-            lexeme = MakeLexeme(
-                CODE_ERROR,
-                $"ошибка: искажено ключевое слово {cleaned}",
-                fragment,
-                line,
-                startCol,
-                currentCol - 1,
-                startIndex,
-                fragment.Length,
-                true);
+            for (int i = 0; i < len; i++)
+            {
+                if (a[i] != b[i])
+                    break;
 
-            newIndex = j;
-            newCol = currentCol;
-            return true;
+                count++;
+            }
+
+            return count >= minLength;
+        }
+
+        private static int LevenshteinDistance(string a, string b)
+        {
+            int[,] d = new int[a.Length + 1, b.Length + 1];
+
+            for (int i = 0; i <= a.Length; i++)
+                d[i, 0] = i;
+
+            for (int j = 0; j <= b.Length; j++)
+                d[0, j] = j;
+
+            for (int i = 1; i <= a.Length; i++)
+            {
+                for (int j = 1; j <= b.Length; j++)
+                {
+                    int cost = a[i - 1] == b[j - 1] ? 0 : 1;
+
+                    d[i, j] = Math.Min(
+                        Math.Min(
+                            d[i - 1, j] + 1,
+                            d[i, j - 1] + 1),
+                        d[i - 1, j - 1] + cost);
+                }
+            }
+
+            return d[a.Length, b.Length];
         }
 
         private static bool TryReadBrokenKeywordTail(
