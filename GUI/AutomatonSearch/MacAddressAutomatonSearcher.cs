@@ -109,7 +109,7 @@ namespace GUI.AutomatonSearch
                    (ch >= 'a' && ch <= 'f');
         }
 
-        private static bool IsStartBoundary(string text, int index)
+        private static bool IsStartBoundary(string text, int index) 
         {
             if (index <= 0)
                 return true;

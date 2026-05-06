@@ -360,7 +360,7 @@ a + b_2 * 15
 
 **Скриншот:**
 
-![Один операнд](images/lab6/03_one_operand.png)
+![Тетрады для простого выражения](images/lab6/03_simple_tetrads.png)
 
 ---
 
@@ -390,7 +390,7 @@ a + b_2 * 15
 
 **Скриншот:**
 
-![Простое сложение](images/lab6/04_simple_addition.png)
+![ПОЛИЗ для простого выражения](images/lab6/04_simple_poliz.png)
 
 ---
 
@@ -421,7 +421,7 @@ a + b_2 * 15
 
 **Скриншот:**
 
-![Проверка приоритета операций](images/lab6/05_priority_operations.png)
+![Тетрады для выражения с приоритетом операций](images/lab6/05_priority_tetrads.png)
 
 ---
 
@@ -452,7 +452,7 @@ a + b_2 * 15
 
 **Скриншот:**
 
-![Проверка скобок](images/lab6/06_parentheses.png)
+![ПОЛИЗ для выражения с приоритетом операций](images/lab6/06_priority_poliz.png)
 
 ---
 
@@ -483,7 +483,7 @@ a + b_2 * 15
 
 **Скриншот:**
 
-![Проверка операции остатка от деления](images/lab6/07_modulo.png)
+![Тетрады для сложного выражения](images/lab6/07_complex_tetrads.png)
 
 ---
 
@@ -514,7 +514,7 @@ a + b_2 * 15
 
 **Скриншот:**
 
-![Проверка левой ассоциативности](images/lab6/08_left_associativity.png)
+![ПОЛИЗ для сложного выражения](images/lab6/08_complex_poliz.png)
 
 ---
 
@@ -547,8 +547,7 @@ a + b_2 * 15
 
 **Скриншот:**
 
-![Сложное корректное выражение](images/lab6/09_complex_expression.png)
-
+![Синтаксическая ошибка](images/lab6/09_syntax_error.png)
 ---
 
 ### 9.8. Выражение с идентификаторами
