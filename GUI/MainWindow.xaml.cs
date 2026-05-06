@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -12,6 +13,7 @@ using GUI.Syntax;
 using GUI.RegexSearch;
 using GUI.AutomatonSearch;
 using GUI.Semantic;
+using GUI.InternalForm;
 
 namespace GUI
 {
@@ -22,6 +24,7 @@ namespace GUI
 
         private readonly RegexSearchService _regexSearchService = new();
         private readonly MacAddressAutomatonSearcher _macAutomatonSearcher = new();
+        private readonly ExpressionInternalFormAnalyzer _internalFormAnalyzer = new();
 
         private enum AnalysisMode
         {
@@ -30,7 +33,8 @@ namespace GUI
             Both,
             SemanticAst,
             RegularExpressions,
-            MacAutomaton
+            MacAutomaton,
+            InternalForm
         }
 
         private sealed class CombinedAnalysisRow
@@ -55,6 +59,7 @@ namespace GUI
                 3 => AnalysisMode.SemanticAst,
                 4 => AnalysisMode.RegularExpressions,
                 5 => AnalysisMode.MacAutomaton,
+                6 => AnalysisMode.InternalForm,
                 _ => AnalysisMode.SemanticAst
             };
 
@@ -86,7 +91,10 @@ namespace GUI
 
         private void UpdateTitle()
         {
-            string fileName = _currentFilePath == null ? "Безымянный" : Path.GetFileName(_currentFilePath);
+            string fileName = _currentFilePath == null
+                ? "Безымянный"
+                : Path.GetFileName(_currentFilePath);
+
             Title = "GUI — " + fileName + (_isDirty ? "*" : "");
         }
 
@@ -109,12 +117,21 @@ namespace GUI
             if (!IsLoaded && AstTextBox == null)
                 return;
 
-            AstTextBox.Text = CurrentAnalysisMode == AnalysisMode.SemanticAst
-                ? "AST появится здесь после запуска семантического анализа."
-                : "AST выводится только в режиме «Семантический + AST».";
+            AstTextBox.Text = CurrentAnalysisMode switch
+            {
+                AnalysisMode.SemanticAst =>
+                    "AST появится здесь после запуска семантического анализа.",
+
+                AnalysisMode.InternalForm =>
+                    "В этом режиме выполняется ЛР6: лексический анализ, синтаксический анализ, построение тетрад, ПОЛИЗ и вычисление значения.",
+
+                _ =>
+                    "AST выводится только в режиме «Семантический + AST». ПОЛИЗ выводится только в режиме «ЛР6: ВПП арифметического выражения»."
+            };
         }
 
         // ---------- Файл ----------
+
         private void FileNew_Click(object sender, RoutedEventArgs e)
         {
             if (!AskSaveIfNeeded())
@@ -123,11 +140,12 @@ namespace GUI
             EditorTextBox.Clear();
             ClearDiagnosticsGrid();
             ConfigureGridForCurrentMode();
-            StatusTextBlock.Text = "Создан новый документ.";
 
             _currentFilePath = null;
             _isDirty = false;
+
             UpdateTitle();
+            StatusTextBlock.Text = "Создан новый файл.";
         }
 
         private void FileOpen_Click(object sender, RoutedEventArgs e)
@@ -135,54 +153,40 @@ namespace GUI
             if (!AskSaveIfNeeded())
                 return;
 
-            OpenFileDialog dlg = new OpenFileDialog
+            var dialog = new OpenFileDialog
             {
                 Filter = "Текстовые файлы (*.txt)|*.txt|Все файлы (*.*)|*.*"
             };
 
-            if (dlg.ShowDialog() == true)
+            if (dialog.ShowDialog() == true)
             {
-                EditorTextBox.Text = File.ReadAllText(dlg.FileName);
-                _currentFilePath = dlg.FileName;
-                _isDirty = false;
-                UpdateTitle();
+                try
+                {
+                    EditorTextBox.Text = File.ReadAllText(dialog.FileName);
+                    _currentFilePath = dialog.FileName;
+                    _isDirty = false;
 
-                ClearDiagnosticsGrid();
-                ConfigureGridForCurrentMode();
-                StatusTextBlock.Text = "Открыт файл: " + dlg.FileName;
+                    UpdateTitle();
+                    ClearDiagnosticsGrid();
+                    ConfigureGridForCurrentMode();
+
+                    StatusTextBlock.Text = "Файл открыт.";
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show("Ошибка открытия файла: " + ex.Message);
+                }
             }
         }
 
         private void FileSave_Click(object sender, RoutedEventArgs e)
         {
-            if (_currentFilePath == null)
-            {
-                FileSaveAs_Click(sender, e);
-                return;
-            }
-
-            File.WriteAllText(_currentFilePath, EditorTextBox.Text);
-            _isDirty = false;
-            UpdateTitle();
-            StatusTextBlock.Text = "Сохранено: " + _currentFilePath;
+            TrySave(false);
         }
 
         private void FileSaveAs_Click(object sender, RoutedEventArgs e)
         {
-            SaveFileDialog dlg = new SaveFileDialog
-            {
-                Filter = "Текстовые файлы (*.txt)|*.txt|Все файлы (*.*)|*.*",
-                FileName = _currentFilePath == null ? "document.txt" : Path.GetFileName(_currentFilePath)
-            };
-
-            if (dlg.ShowDialog() == true)
-            {
-                _currentFilePath = dlg.FileName;
-                File.WriteAllText(_currentFilePath, EditorTextBox.Text);
-                _isDirty = false;
-                UpdateTitle();
-                StatusTextBlock.Text = "Сохранено: " + _currentFilePath;
-            }
+            TrySave(true);
         }
 
         private void FileExit_Click(object sender, RoutedEventArgs e)
@@ -190,7 +194,7 @@ namespace GUI
             Close();
         }
 
-        private void Window_Closing(object? sender, CancelEventArgs e)
+        private void Window_Closing(object sender, CancelEventArgs e)
         {
             if (!AskSaveIfNeeded())
                 e.Cancel = true;
@@ -201,53 +205,55 @@ namespace GUI
             if (!_isDirty)
                 return true;
 
-            var res = MessageBox.Show(
-                "Есть несохранённые изменения. Сохранить?",
+            var result = MessageBox.Show(
+                "Текст был изменён. Сохранить изменения?",
                 "GUI",
                 MessageBoxButton.YesNoCancel,
                 MessageBoxImage.Question);
 
-            if (res == MessageBoxResult.Cancel)
+            if (result == MessageBoxResult.Cancel)
                 return false;
 
-            if (res == MessageBoxResult.Yes)
-                return TrySave();
+            if (result == MessageBoxResult.Yes)
+                return TrySave(false);
 
             return true;
         }
 
-        private bool TrySave()
+        private bool TrySave(bool saveAs)
         {
+            if (_currentFilePath == null || saveAs)
+            {
+                var dialog = new SaveFileDialog
+                {
+                    Filter = "Текстовые файлы (*.txt)|*.txt|Все файлы (*.*)|*.*"
+                };
+
+                if (dialog.ShowDialog() != true)
+                    return false;
+
+                _currentFilePath = dialog.FileName;
+            }
+
             try
             {
-                if (_currentFilePath == null)
-                {
-                    SaveFileDialog dlg = new SaveFileDialog
-                    {
-                        Filter = "Текстовые файлы (*.txt)|*.txt|Все файлы (*.*)|*.*",
-                        FileName = "document.txt"
-                    };
-
-                    if (dlg.ShowDialog() != true)
-                        return false;
-
-                    _currentFilePath = dlg.FileName;
-                }
-
                 File.WriteAllText(_currentFilePath, EditorTextBox.Text);
                 _isDirty = false;
+
                 UpdateTitle();
-                StatusTextBlock.Text = "Сохранено: " + _currentFilePath;
+                StatusTextBlock.Text = "Файл сохранён.";
+
                 return true;
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Ошибка сохранения: " + ex.Message);
+                MessageBox.Show("Ошибка сохранения файла: " + ex.Message);
                 return false;
             }
         }
 
         // ---------- Правка ----------
+
         private void EditUndo_Click(object sender, RoutedEventArgs e)
         {
             if (EditorTextBox.CanUndo)
@@ -277,17 +283,17 @@ namespace GUI
 
         private void EditDelete_Click(object sender, RoutedEventArgs e)
         {
-            if (!string.IsNullOrEmpty(EditorTextBox.SelectedText))
+            if (EditorTextBox.SelectionLength > 0)
                 EditorTextBox.SelectedText = "";
         }
 
         private void EditSelectAll_Click(object sender, RoutedEventArgs e)
         {
             EditorTextBox.SelectAll();
-            EditorTextBox.Focus();
         }
 
-        // ---------- Текст ----------
+        // ---------- Текстовые окна ----------
+
         private void TextTask_Click(object sender, RoutedEventArgs e)
         {
             ShowTextFromFile("Постановка задачи", "task.txt");
@@ -300,12 +306,12 @@ namespace GUI
 
         private void TextGrammarClass_Click(object sender, RoutedEventArgs e)
         {
-            ShowTextFromFile("Классификация грамматики", "class.txt");
+            ShowTextFromFile("Классификация грамматики", "grammar_class.txt");
         }
 
         private void TextAnalyzeMethod_Click(object sender, RoutedEventArgs e)
         {
-            ShowTextFromFile("Метод анализа", "method.txt");
+            ShowTextFromFile("Метод анализа", "analyze_method.txt");
         }
 
         private void TextTest_Click(object sender, RoutedEventArgs e)
@@ -337,6 +343,7 @@ namespace GUI
                         "GUI",
                         MessageBoxButton.OK,
                         MessageBoxImage.Warning);
+
                     return;
                 }
 
@@ -350,6 +357,7 @@ namespace GUI
         }
 
         // ---------- Режимы анализа ----------
+
         private void AnalysisModeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (!IsLoaded)
@@ -367,6 +375,7 @@ namespace GUI
                 AnalysisMode.SemanticAst => "Выбран режим: семантический анализ и построение AST.",
                 AnalysisMode.RegularExpressions => "Выбран режим: регулярные выражения.",
                 AnalysisMode.MacAutomaton => "Выбран режим: автоматный поиск MAC-адресов.",
+                AnalysisMode.InternalForm => "Выбран режим: ЛР6, внутренняя форма арифметического выражения.",
                 _ => "Ожидание..."
             };
         }
@@ -397,6 +406,10 @@ namespace GUI
 
                 case AnalysisMode.MacAutomaton:
                     ConfigureRegexColumns();
+                    break;
+
+                case AnalysisMode.InternalForm:
+                    ConfigureTetradColumns();
                     break;
             }
 
@@ -580,7 +593,53 @@ namespace GUI
             });
         }
 
+        private void ConfigureTetradColumns()
+        {
+            LexemesGrid.Columns.Clear();
+
+            LexemesGrid.Columns.Add(new DataGridTextColumn
+            {
+                Header = "№",
+                Binding = new System.Windows.Data.Binding("Number"),
+                Width = DataGridLength.Auto,
+                MinWidth = 60
+            });
+
+            LexemesGrid.Columns.Add(new DataGridTextColumn
+            {
+                Header = "op",
+                Binding = new System.Windows.Data.Binding("Operation"),
+                Width = DataGridLength.Auto,
+                MinWidth = 80
+            });
+
+            LexemesGrid.Columns.Add(new DataGridTextColumn
+            {
+                Header = "arg1",
+                Binding = new System.Windows.Data.Binding("Argument1"),
+                Width = new DataGridLength(1, DataGridLengthUnitType.Star),
+                MinWidth = 120
+            });
+
+            LexemesGrid.Columns.Add(new DataGridTextColumn
+            {
+                Header = "arg2",
+                Binding = new System.Windows.Data.Binding("Argument2"),
+                Width = new DataGridLength(1, DataGridLengthUnitType.Star),
+                MinWidth = 120
+            });
+
+            LexemesGrid.Columns.Add(new DataGridTextColumn
+            {
+                Header = "result",
+                Binding = new System.Windows.Data.Binding("Result"),
+                Width = new DataGridLength(1, DataGridLengthUnitType.Star),
+                MinWidth = 120
+            });
+        }
+
         // ---------- Пуск ----------
+
         private void Run_Click(object sender, RoutedEventArgs e)
         {
             string text = EditorTextBox.Text;
@@ -597,6 +656,12 @@ namespace GUI
             if (CurrentAnalysisMode == AnalysisMode.MacAutomaton)
             {
                 ShowMacAutomatonResult(text);
+                return;
+            }
+
+            if (CurrentAnalysisMode == AnalysisMode.InternalForm)
+            {
+                ShowInternalFormResult(text);
                 return;
             }
 
@@ -636,6 +701,182 @@ namespace GUI
                     ShowSemanticResult(lexemes, lexicalErrors);
                     break;
             }
+        }
+
+        private void ShowInternalFormResult(string text)
+        {
+            ConfigureTetradColumns();
+
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                LexemesGrid.ItemsSource = null;
+                AstTextBox.Text = "Введите арифметическое выражение для построения внутренней формы программы.";
+                StatusTextBlock.Text = "Ожидается арифметическое выражение.";
+                return;
+            }
+
+            var result = _internalFormAnalyzer.Analyze(text);
+
+            if (result.HasLexicalErrors)
+            {
+                ConfigureParserColumns();
+                LexemesGrid.ItemsSource = result.LexicalErrors;
+                AstTextBox.Text = BuildInternalFormDetailsText(result);
+                ResultTabControl.SelectedIndex = 0;
+
+                StatusTextBlock.Text =
+                    $"ЛР6 завершена с ошибками. ВПП не построено. Лексических ошибок: {result.LexicalErrors.Count}.";
+
+                return;
+            }
+
+            if (result.HasSyntaxErrors)
+            {
+                ConfigureParserColumns();
+                LexemesGrid.ItemsSource = result.SyntaxErrors;
+                AstTextBox.Text = BuildInternalFormDetailsText(result);
+                ResultTabControl.SelectedIndex = 0;
+
+                StatusTextBlock.Text =
+                    $"ЛР6 завершена с ошибками. ВПП не построено. Синтаксических ошибок: {result.SyntaxErrors.Count}.";
+
+                return;
+            }
+
+            ConfigureTetradColumns();
+            LexemesGrid.ItemsSource = result.Tetrads;
+            AstTextBox.Text = BuildInternalFormDetailsText(result);
+
+            ResultTabControl.SelectedIndex = result.Tetrads.Count > 0 ? 0 : 1;
+
+            if (result.ContainsIdentifier)
+            {
+                StatusTextBlock.Text =
+                    $"ЛР6 выполнена успешно. Тетрад: {result.Tetrads.Count}. ПОЛИЗ и вычисление не выполняются, так как выражение содержит идентификаторы.";
+            }
+            else
+            {
+                StatusTextBlock.Text =
+                    $"ЛР6 выполнена успешно. Тетрад: {result.Tetrads.Count}. ПОЛИЗ: {result.PolizText}. Значение: {result.EvaluationText}.";
+            }
+        }
+
+        private string BuildInternalFormDetailsText(InternalFormResult result)
+        {
+            var sb = new StringBuilder();
+
+            sb.AppendLine("Грамматика:");
+            sb.AppendLine("E → T A");
+            sb.AppendLine("A → ε | + T A | - T A");
+            sb.AppendLine("T → F B");
+            sb.AppendLine("B → ε | * F B | / F B | % F B");
+            sb.AppendLine("F → num | id | (E)");
+            sb.AppendLine();
+
+            sb.AppendLine("1. Лексический анализ");
+            sb.AppendLine("Выделенные лексемы:");
+            sb.AppendLine();
+
+            if (result.Lexemes.Count == 0)
+            {
+                sb.AppendLine("Лексемы не найдены.");
+            }
+            else
+            {
+                foreach (var lexeme in result.Lexemes)
+                {
+                    string marker = lexeme.IsError ? "ОШИБКА" : "лексема";
+
+                    sb.AppendLine(
+                        $"{marker}: \"{lexeme.Text}\" — {lexeme.Type}; {lexeme.Location}");
+                }
+            }
+
+            sb.AppendLine();
+
+            if (result.HasLexicalErrors)
+            {
+                sb.AppendLine("Лексические ошибки:");
+                foreach (var error in result.LexicalErrors)
+                {
+                    sb.AppendLine(
+                        $"- \"{error.InvalidFragment}\"; {error.Location}; {error.Description}");
+                }
+
+                sb.AppendLine();
+                sb.AppendLine("Синтаксический анализ, тетрады и ПОЛИЗ не выполняются, так как сначала нужно исправить лексические ошибки.");
+                return sb.ToString();
+            }
+
+            sb.AppendLine("Лексический анализ завершён успешно. Лексических ошибок нет.");
+            sb.AppendLine();
+
+            sb.AppendLine("2. Синтаксический анализ методом рекурсивного спуска");
+            sb.AppendLine("Схема вызовов:");
+            sb.AppendLine("E() → T(); затем обработка + и -");
+            sb.AppendLine("T() → F(); затем обработка *, / и %");
+            sb.AppendLine("F() → num | id | (E)");
+            sb.AppendLine();
+
+            if (result.HasSyntaxErrors)
+            {
+                sb.AppendLine("Синтаксические ошибки:");
+                foreach (var error in result.SyntaxErrors)
+                {
+                    sb.AppendLine(
+                        $"- \"{error.InvalidFragment}\"; {error.Location}; {error.Description}");
+                }
+
+                sb.AppendLine();
+                sb.AppendLine("Тетрады и ПОЛИЗ не строятся, так как выражение содержит синтаксические ошибки.");
+                return sb.ToString();
+            }
+
+            sb.AppendLine("Синтаксический анализ завершён успешно. Синтаксических ошибок нет.");
+            sb.AppendLine();
+
+            sb.AppendLine("3. Внутренняя форма представления программы");
+            sb.AppendLine("Тетрады построены и отображены в таблице слева.");
+            sb.AppendLine();
+
+            if (result.Tetrads.Count == 0)
+            {
+                sb.AppendLine("Тетрад нет, так как выражение состоит из одного операнда.");
+            }
+            else
+            {
+                sb.AppendLine("Формат тетрады: (op, arg1, arg2, result).");
+                sb.AppendLine();
+                sb.AppendLine("Тетрады:");
+
+                foreach (var tetrad in result.Tetrads)
+                {
+                    sb.AppendLine(
+                        $"{tetrad.Number}) ({tetrad.Operation}, {tetrad.Argument1}, {tetrad.Argument2}, {tetrad.Result})");
+                }
+            }
+
+            sb.AppendLine();
+
+            sb.AppendLine("4. ПОЛИЗ и вычисление");
+
+            if (result.ContainsIdentifier)
+            {
+                sb.AppendLine("ПОЛИЗ и вычисление значения не выполняются.");
+                sb.AppendLine("Причина: выражение содержит идентификаторы.");
+                sb.AppendLine("По заданию ПОЛИЗ и вычисление выполняются только для арифметического выражения из целых чисел.");
+            }
+            else
+            {
+                sb.AppendLine("ПОЛИЗ:");
+                sb.AppendLine(string.IsNullOrWhiteSpace(result.PolizText) ? "ПОЛИЗ пуст." : result.PolizText);
+                sb.AppendLine();
+
+                sb.AppendLine("Результат вычисления:");
+                sb.AppendLine(string.IsNullOrWhiteSpace(result.EvaluationText) ? "Результат отсутствует." : result.EvaluationText);
+            }
+
+            return sb.ToString();
         }
 
         private void ShowSemanticResult(List<Lexeme> lexemes, List<Lexeme> lexicalErrors)
@@ -731,6 +972,7 @@ namespace GUI
                 int colTo = start.ColumnTo;
 
                 int j = i + 1;
+
                 while (j < lexemes.Count &&
                        lexemes[j].IsError &&
                        lexemes[j].StartIndex == startIndex + length)
@@ -872,6 +1114,7 @@ namespace GUI
             LexemesGrid.ItemsSource = rows;
 
             int totalErrors = lexicalErrors.Count + syntaxResult.Errors.Count;
+
             StatusTextBlock.Text =
                 $"Лексический и синтаксический анализ завершены. Общее количество найденных ошибок: {totalErrors}.";
         }
@@ -908,6 +1151,7 @@ namespace GUI
         {
             LexemesGrid.ItemsSource = null;
             LexemesGrid.Items.Clear();
+
             AstTextBox.Clear();
             ResultTabControl.SelectedIndex = 0;
         }
@@ -943,10 +1187,12 @@ namespace GUI
             {
                 case Lexeme lex:
                     HighlightFragment(lex.StartIndex, lex.Length);
+
                     if (lex.IsError)
                         StatusTextBlock.Text = $"Переход к ошибке: {lex.Location}";
                     else
                         StatusTextBlock.Text = $"Выделена лексема: {lex.Text} ({lex.Location})";
+
                     break;
 
                 case SyntaxErrorInfo error:
@@ -957,6 +1203,21 @@ namespace GUI
                 case SemanticErrorInfo semanticError:
                     HighlightFragment(semanticError.StartIndex, semanticError.Length);
                     StatusTextBlock.Text = $"Переход к ошибке: {semanticError.Location}";
+                    break;
+
+                case ExpressionToken expressionToken:
+                    HighlightFragment(expressionToken.StartIndex, expressionToken.Length);
+
+                    if (expressionToken.IsError)
+                        StatusTextBlock.Text = $"Переход к лексической ошибке ЛР6: {expressionToken.Location}";
+                    else
+                        StatusTextBlock.Text = $"Выделена лексема ЛР6: {expressionToken.Text} ({expressionToken.Location})";
+
+                    break;
+
+                case ExpressionErrorInfo expressionError:
+                    HighlightFragment(expressionError.StartIndex, expressionError.Length);
+                    StatusTextBlock.Text = $"Переход к ошибке ЛР6: {expressionError.Location}";
                     break;
 
                 case CombinedAnalysisRow row when row.StartIndex >= 0:
@@ -1007,6 +1268,7 @@ namespace GUI
         }
 
         // ---------- Окна ----------
+
         private string ReadTextFileOrError(string fileName)
         {
             string path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Texts", fileName);
