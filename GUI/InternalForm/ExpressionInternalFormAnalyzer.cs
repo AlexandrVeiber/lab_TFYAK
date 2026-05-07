@@ -112,9 +112,13 @@ namespace GUI.InternalForm
 
             if (result.HasLexicalErrors)
             {
+                AddParenthesisBalanceErrors(result);
+
                 result.DetailsText =
                     "Внутренняя форма программы не построена, так как обнаружены лексические ошибки.\n" +
+                    "Дополнительно выполнена проверка баланса круглых скобок.\n" +
                     "Сначала исправьте недопустимые символы или фрагменты.";
+
                 return result;
             }
 
@@ -162,6 +166,59 @@ namespace GUI.InternalForm
 
             result.DetailsText = BuildDetailsText(result);
             return result;
+        }
+
+
+
+        private static void AddParenthesisBalanceErrors(InternalFormResult result)
+        {
+            var stack = new Stack<ExpressionToken>();
+
+            foreach (var token in result.Lexemes.Where(t => !t.IsError))
+            {
+                if (token.TokenType == ExpressionTokenType.LeftParenthesis)
+                {
+                    stack.Push(token);
+                }
+                else if (token.TokenType == ExpressionTokenType.RightParenthesis)
+                {
+                    if (stack.Count > 0)
+                    {
+                        stack.Pop();
+                    }
+                    else
+                    {
+                        result.SyntaxErrors.Add(new ExpressionErrorInfo
+                        {
+                            InvalidFragment = token.Text,
+                            Location = $"строка {token.Line}, позиция {token.ColumnFrom}",
+                            Description = "Лишняя закрывающая скобка \")\".",
+                            StartIndex = token.StartIndex,
+                            Length = token.Length,
+                            Line = token.Line,
+                            ColumnFrom = token.ColumnFrom,
+                            ColumnTo = token.ColumnTo
+                        });
+                    }
+                }
+            }
+
+            while (stack.Count > 0)
+            {
+                var token = stack.Pop();
+
+                result.SyntaxErrors.Add(new ExpressionErrorInfo
+                {
+                    InvalidFragment = token.Text,
+                    Location = $"строка {token.Line}, позиция {token.ColumnFrom}",
+                    Description = "Пропущена закрывающая скобка \")\".",
+                    StartIndex = token.StartIndex,
+                    Length = token.Length,
+                    Line = token.Line,
+                    ColumnFrom = token.ColumnFrom,
+                    ColumnTo = token.ColumnTo
+                });
+            }
         }
 
         private static string BuildDetailsText(InternalFormResult result)

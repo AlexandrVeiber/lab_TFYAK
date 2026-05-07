@@ -720,12 +720,20 @@ namespace GUI
             if (result.HasLexicalErrors)
             {
                 ConfigureParserColumns();
-                LexemesGrid.ItemsSource = result.LexicalErrors;
+
+                var allErrors = result.LexicalErrors
+                    .Concat(result.SyntaxErrors)
+                    .ToList();
+
+                LexemesGrid.ItemsSource = allErrors;
                 AstTextBox.Text = BuildInternalFormDetailsText(result);
                 ResultTabControl.SelectedIndex = 0;
 
                 StatusTextBlock.Text =
-                    $"ЛР6 завершена с ошибками. ВПП не построено. Лексических ошибок: {result.LexicalErrors.Count}.";
+                    $"ЛР6 завершена с ошибками. ВПП не построено. " +
+                    $"Лексических ошибок: {result.LexicalErrors.Count}. " +
+                    $"Синтаксических ошибок: {result.SyntaxErrors.Count}. " +
+                    $"Всего ошибок: {allErrors.Count}.";
 
                 return;
             }
@@ -803,8 +811,19 @@ namespace GUI
                         $"- \"{error.InvalidFragment}\"; {error.Location}; {error.Description}");
                 }
 
+                if (result.SyntaxErrors.Count > 0)
+                {
+                    sb.AppendLine();
+                    sb.AppendLine("Дополнительные синтаксические ошибки:");
+                    foreach (var error in result.SyntaxErrors)
+                    {
+                        sb.AppendLine(
+                            $"- \"{error.InvalidFragment}\"; {error.Location}; {error.Description}");
+                    }
+                }
+
                 sb.AppendLine();
-                sb.AppendLine("Синтаксический анализ, тетрады и ПОЛИЗ не выполняются, так как сначала нужно исправить лексические ошибки.");
+                sb.AppendLine("Полный синтаксический анализ, тетрады и ПОЛИЗ не выполняются, так как сначала нужно исправить лексические ошибки.");
                 return sb.ToString();
             }
 
