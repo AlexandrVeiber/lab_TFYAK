@@ -110,14 +110,34 @@ namespace GUI.InternalForm
                 });
             }
 
+            /*
+             * Важный момент:
+             * если есть лексические ошибки, полноценный синтаксический анализ
+             * для построения ВПП выполнять нельзя.
+             *
+             * Но для диагностики мы всё равно запускаем парсер по корректным лексемам,
+             * чтобы дополнительно найти ошибки вида:
+             * - пропущена закрывающая скобка;
+             * - лишняя закрывающая скобка;
+             * - пропущен операнд;
+             * - лишний фрагмент.
+             *
+             * Тетрады и ПОЛИЗ при этом НЕ строятся.
+             */
             if (result.HasLexicalErrors)
             {
-                AddParenthesisBalanceErrors(result);
+                bool hasValidTokens = result.Lexemes.Any(t => !t.IsError);
+
+                if (hasValidTokens)
+                {
+                    var diagnosticParser = new ExpressionParser(result);
+                    diagnosticParser.Parse();
+                }
 
                 result.DetailsText =
                     "Внутренняя форма программы не построена, так как обнаружены лексические ошибки.\n" +
-                    "Дополнительно выполнена проверка баланса круглых скобок.\n" +
-                    "Сначала исправьте недопустимые символы или фрагменты.";
+                    "Дополнительно выполнен диагностический синтаксический проход по корректным лексемам.\n" +
+                    "Тетрады и ПОЛИЗ не строятся.";
 
                 return result;
             }
@@ -168,64 +188,11 @@ namespace GUI.InternalForm
             return result;
         }
 
-
-
-        private static void AddParenthesisBalanceErrors(InternalFormResult result)
-        {
-            var stack = new Stack<ExpressionToken>();
-
-            foreach (var token in result.Lexemes.Where(t => !t.IsError))
-            {
-                if (token.TokenType == ExpressionTokenType.LeftParenthesis)
-                {
-                    stack.Push(token);
-                }
-                else if (token.TokenType == ExpressionTokenType.RightParenthesis)
-                {
-                    if (stack.Count > 0)
-                    {
-                        stack.Pop();
-                    }
-                    else
-                    {
-                        result.SyntaxErrors.Add(new ExpressionErrorInfo
-                        {
-                            InvalidFragment = token.Text,
-                            Location = $"строка {token.Line}, позиция {token.ColumnFrom}",
-                            Description = "Лишняя закрывающая скобка \")\".",
-                            StartIndex = token.StartIndex,
-                            Length = token.Length,
-                            Line = token.Line,
-                            ColumnFrom = token.ColumnFrom,
-                            ColumnTo = token.ColumnTo
-                        });
-                    }
-                }
-            }
-
-            while (stack.Count > 0)
-            {
-                var token = stack.Pop();
-
-                result.SyntaxErrors.Add(new ExpressionErrorInfo
-                {
-                    InvalidFragment = token.Text,
-                    Location = $"строка {token.Line}, позиция {token.ColumnFrom}",
-                    Description = "Пропущена закрывающая скобка \")\".",
-                    StartIndex = token.StartIndex,
-                    Length = token.Length,
-                    Line = token.Line,
-                    ColumnFrom = token.ColumnFrom,
-                    ColumnTo = token.ColumnTo
-                });
-            }
-        }
-
         private static string BuildDetailsText(InternalFormResult result)
         {
             var sb = new StringBuilder();
 
-            sb.AppendLine("Грамматика варианта:");
+            sb.AppendLine("Грамматика:");
             sb.AppendLine("E → T A");
             sb.AppendLine("A → ε | + T A | - T A");
             sb.AppendLine("T → F B");

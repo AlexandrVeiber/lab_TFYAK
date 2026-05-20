@@ -34,7 +34,8 @@ namespace GUI
             SemanticAst,
             RegularExpressions,
             MacAutomaton,
-            InternalForm
+            InternalForm,
+            TacOptimization
         }
 
         private sealed class CombinedAnalysisRow
@@ -60,6 +61,7 @@ namespace GUI
                 4 => AnalysisMode.RegularExpressions,
                 5 => AnalysisMode.MacAutomaton,
                 6 => AnalysisMode.InternalForm,
+                7 => AnalysisMode.TacOptimization,
                 _ => AnalysisMode.SemanticAst
             };
 
@@ -124,6 +126,9 @@ namespace GUI
 
                 AnalysisMode.InternalForm =>
                     "В этом режиме выполняется ЛР6: лексический анализ, синтаксический анализ, построение тетрад, ПОЛИЗ и вычисление значения.",
+
+                AnalysisMode.TacOptimization =>
+                    "TAC и оптимизации do-while появятся здесь после запуска.",
 
                 _ =>
                     "AST выводится только в режиме «Семантический + AST». ПОЛИЗ выводится только в режиме «ЛР6: ВПП арифметического выражения»."
@@ -376,6 +381,7 @@ namespace GUI
                 AnalysisMode.RegularExpressions => "Выбран режим: регулярные выражения.",
                 AnalysisMode.MacAutomaton => "Выбран режим: автоматный поиск MAC-адресов.",
                 AnalysisMode.InternalForm => "Выбран режим: ЛР6, внутренняя форма арифметического выражения.",
+                AnalysisMode.TacOptimization => "Выбран режим: Доп. ЛР7 - TAC и оптимизации do-while.",
                 _ => "Ожидание..."
             };
         }
@@ -410,6 +416,10 @@ namespace GUI
 
                 case AnalysisMode.InternalForm:
                     ConfigureTetradColumns();
+                    break;
+
+                case AnalysisMode.TacOptimization:
+                    ConfigureTacColumns();
                     break;
             }
 
@@ -638,6 +648,51 @@ namespace GUI
             });
         }
 
+        private void ConfigureTacColumns()
+        {
+            LexemesGrid.Columns.Clear();
+
+            LexemesGrid.Columns.Add(new DataGridTextColumn
+            {
+                Header = "Строка",
+                Binding = new System.Windows.Data.Binding("Line"),
+                Width = DataGridLength.Auto,
+                MinWidth = 60
+            });
+
+            LexemesGrid.Columns.Add(new DataGridTextColumn
+            {
+                Header = "Операция",
+                Binding = new System.Windows.Data.Binding("Operation"),
+                Width = new DataGridLength(1, DataGridLengthUnitType.Star),
+                MinWidth = 80
+            });
+
+            LexemesGrid.Columns.Add(new DataGridTextColumn
+            {
+                Header = "Arg1",
+                Binding = new System.Windows.Data.Binding("Arg1"),
+                Width = new DataGridLength(1, DataGridLengthUnitType.Star),
+                MinWidth = 80
+            });
+
+            LexemesGrid.Columns.Add(new DataGridTextColumn
+            {
+                Header = "Arg2",
+                Binding = new System.Windows.Data.Binding("Arg2"),
+                Width = new DataGridLength(1, DataGridLengthUnitType.Star),
+                MinWidth = 80
+            });
+
+            LexemesGrid.Columns.Add(new DataGridTextColumn
+            {
+                Header = "Результат",
+                Binding = new System.Windows.Data.Binding("Result"),
+                Width = new DataGridLength(1, DataGridLengthUnitType.Star),
+                MinWidth = 80
+            });
+        }
+
         // ---------- Пуск ----------
 
         private void Run_Click(object sender, RoutedEventArgs e)
@@ -662,6 +717,12 @@ namespace GUI
             if (CurrentAnalysisMode == AnalysisMode.InternalForm)
             {
                 ShowInternalFormResult(text);
+                return;
+            }
+
+            if (CurrentAnalysisMode == AnalysisMode.TacOptimization)
+            {
+                ShowTacOptimizationResult(text);
                 return;
             }
 
@@ -746,7 +807,9 @@ namespace GUI
                 ResultTabControl.SelectedIndex = 0;
 
                 StatusTextBlock.Text =
-                    $"ЛР6 завершена с ошибками. ВПП не построено. Синтаксических ошибок: {result.SyntaxErrors.Count}.";
+                    $"ЛР6 завершена с ошибками. ВПП не построено. " +
+                    $"Синтаксических ошибок: {result.SyntaxErrors.Count}. " +
+                    $"Всего ошибок: {result.SyntaxErrors.Count}.";
 
                 return;
             }
@@ -760,12 +823,14 @@ namespace GUI
             if (result.ContainsIdentifier)
             {
                 StatusTextBlock.Text =
-                    $"ЛР6 выполнена успешно. Тетрад: {result.Tetrads.Count}. ПОЛИЗ и вычисление не выполняются, так как выражение содержит идентификаторы.";
+                    $"ЛР6 выполнена успешно. Тетрад: {result.Tetrads.Count}. " +
+                    "ПОЛИЗ и вычисление не выполняются, так как выражение содержит идентификаторы.";
             }
             else
             {
                 StatusTextBlock.Text =
-                    $"ЛР6 выполнена успешно. Тетрад: {result.Tetrads.Count}. ПОЛИЗ: {result.PolizText}. Значение: {result.EvaluationText}.";
+                    $"ЛР6 выполнена успешно. Тетрад: {result.Tetrads.Count}. " +
+                    $"ПОЛИЗ: {result.PolizText}. Значение: {result.EvaluationText}.";
             }
         }
 
@@ -824,6 +889,8 @@ namespace GUI
 
                 sb.AppendLine();
                 sb.AppendLine("Полный синтаксический анализ, тетрады и ПОЛИЗ не выполняются, так как сначала нужно исправить лексические ошибки.");
+                sb.AppendLine("Дополнительный синтаксический проход используется только для диагностики структуры выражения.");
+
                 return sb.ToString();
             }
 
@@ -966,6 +1033,110 @@ namespace GUI
             {
                 StatusTextBlock.Text = $"Автоматный поиск завершён. Тип: MAC-адреса. Найдено совпадений: {results.Count}.";
             }
+        }
+
+        private void ShowTacOptimizationResult(string text)
+        {
+            ConfigureTacColumns(); // колонки для TAC, но при ошибках мы переключимся на парсерные
+
+            // 1. Лексический анализ
+            var scanner = new LexicalAnalyzer();
+            var lexemes = scanner.Analyze(text);
+            lexemes = MergeAdjacentLexicalErrors(lexemes);
+
+            // Проверим лексические ошибки сразу
+            var lexicalErrors = lexemes.Where(l => l.IsError).ToList();
+            if (lexicalErrors.Count > 0)
+            {
+                // Покажем только лексические ошибки
+                ConfigureParserColumns(); // переключимся на колонки для ошибок
+                var errorsForGrid = lexicalErrors.Select(err => new SyntaxErrorInfo
+                {
+                    InvalidFragment = err.Text,
+                    Location = $"строка {err.Line}, позиция {err.ColumnFrom}",
+                    Description = err.Type,
+                    StartIndex = err.StartIndex,
+                    Length = err.Length,
+                    Line = err.Line,
+                    ColumnFrom = err.ColumnFrom,
+                    ColumnTo = err.ColumnTo
+                }).ToList();
+                LexemesGrid.ItemsSource = errorsForGrid;
+
+                var sb = new StringBuilder();
+                sb.AppendLine("Лексические ошибки. TAC не построен.");
+                sb.AppendLine();
+                foreach (var err in lexicalErrors)
+                {
+                    sb.AppendLine($"- \"{err.Text}\": {err.Type} (строка {err.Line}, позиция {err.ColumnFrom})");
+                }
+                AstTextBox.Text = sb.ToString();
+                StatusTextBlock.Text = $"Лексических ошибок: {lexicalErrors.Count}. TAC не построен.";
+                return;
+            }
+
+            // 2. Синтаксический анализ
+            var syntaxAnalyzer = new SyntaxAnalyzer();
+            var syntaxResult = syntaxAnalyzer.Analyze(lexemes);
+            if (!syntaxResult.Success)
+            {
+                // Отображаем синтаксические ошибки
+                ConfigureParserColumns();
+                LexemesGrid.ItemsSource = syntaxResult.Errors;
+
+                var sb = new StringBuilder();
+                sb.AppendLine("Синтаксические ошибки. TAC не построен.");
+                sb.AppendLine();
+                foreach (var err in syntaxResult.Errors)
+                {
+                    sb.AppendLine($"- \"{err.InvalidFragment}\": {err.Description} ({err.Location})");
+                }
+                AstTextBox.Text = sb.ToString();
+                StatusTextBlock.Text = $"Синтаксических ошибок: {syntaxResult.Errors.Count}. TAC не построен.";
+                return;
+            }
+
+            // 3. Семантический анализ (AST)
+            var semantic = new SemanticAnalyzer();
+            var semanticResult = semantic.Analyze(lexemes);
+            if (semanticResult.Root == null || !(semanticResult.Root is DoWhileNode doWhile))
+            {
+                LexemesGrid.ItemsSource = null;
+                AstTextBox.Text = "Не удалось распознать конструкцию do-while. Проверьте, что вводимое выражение соответствует грамматике do-while.";
+                StatusTextBlock.Text = "Ошибка построения AST";
+                return;
+            }
+
+            // 4. Генерация TAC
+            var generator = new TacGenerator();
+            var tac = generator.GenerateFromDoWhile(doWhile);
+            string originalTac = TacOptimizer.FormatInstructions(tac);
+
+            // 5. Оптимизации
+            var afterFold = TacOptimizer.FoldConstants(tac);
+            string foldedTac = TacOptimizer.FormatInstructions(afterFold);
+
+            var afterProp = TacOptimizer.EliminateCopyChains(afterFold);
+            string propTac = TacOptimizer.FormatInstructions(afterProp);
+
+            // 6. Вывод в таблицу (исходные инструкции) – возвращаем TAC-колонки
+            ConfigureTacColumns();
+            LexemesGrid.ItemsSource = tac;
+
+            // 7. Вывод результатов в AstTextBox
+            var sbResult = new StringBuilder();
+            sbResult.AppendLine("=== Исходный трехадресный код (TAC) ===");
+            sbResult.AppendLine(originalTac);
+            sbResult.AppendLine();
+            sbResult.AppendLine("=== После свертки констант ===");
+            sbResult.AppendLine(foldedTac);
+            sbResult.AppendLine();
+            sbResult.AppendLine("=== После распространения копий ===");
+            sbResult.AppendLine(propTac);
+            AstTextBox.Text = sbResult.ToString();
+
+            // 8. Статус
+            StatusTextBlock.Text = $"TAC построен. Инструкций: {tac.Count}. Оптимизации выполнены.";
         }
 
         private List<Lexeme> MergeAdjacentLexicalErrors(List<Lexeme> lexemes)
@@ -1247,6 +1418,11 @@ namespace GUI
                 case RegexSearchResult regexResult:
                     HighlightFragment(regexResult.StartIndex, regexResult.Length);
                     StatusTextBlock.Text = $"Переход к найденному фрагменту: {regexResult.StartPosition}";
+                    break;
+
+                case TacInstruction tacInstr:
+                    // Подсветка не поддерживается для TAC, просто сообщение
+                    StatusTextBlock.Text = $"Инструкция: {tacInstr}";
                     break;
             }
         }

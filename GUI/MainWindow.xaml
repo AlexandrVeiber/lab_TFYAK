@@ -157,6 +157,7 @@
                         <ComboBoxItem Content="Регулярные выражения"/>
                         <ComboBoxItem Content="Автомат (MAC-адреса)"/>
                         <ComboBoxItem Content="ЛР6: ВПП арифметического выражения"/>
+                        <ComboBoxItem Content="Доп. ЛР7: TAC и оптимизации do-while"/>
                     </ComboBox>
 
                     <TextBlock x:Name="RegexTaskLabel"
